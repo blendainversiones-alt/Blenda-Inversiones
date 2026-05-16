@@ -571,8 +571,9 @@
             <input id="i-unidad" type="text" placeholder="ej: toneladas, cabezas, kg" />
           </div>
           <div class="form-group">
-            <label for="i-origen">Origen / Lote</label>
-            <input id="i-origen" type="text" placeholder="Ej: Campo Norte, Lote 3" />
+            <label for="i-origen">Campo / Lote *</label>
+            <input id="i-origen" type="text" placeholder="Ej: Campo Norte, Lote 3" list="lista-campos" required />
+            <datalist id="lista-campos"></datalist>
           </div>
           <div class="form-group" style="grid-column: 1 / -1;">
             <label for="i-notas">Observaciones</label>
@@ -1115,13 +1116,14 @@ function renderDashboard() {
   salidas.forEach(s  => { totSalido[s.producto]   = (totSalido[s.producto]||0)   + (parseFloat(s.cantidad)||0); });
 
   const aviso = sinStock
-    ? `<div class="alert-banner" style="margin-bottom:1rem">📥 Para ver el stock restante, primero cargá el stock disponible en la pestaña <strong>📦 Stock → Cargar ingreso</strong>.</div>`
+    ? `<div class="alert-banner" style="margin-bottom:1rem;grid-column:1/-1">📥 Para ver el stock restante, primero cargá el stock en la pestaña <strong>📦 Stock → Cargar ingreso</strong>.</div>`
     : '';
 
-  document.getElementById('dash-stock').innerHTML = aviso + PRODUCTOS.map(p => {
+  const productosConMov = PRODUCTOS.filter(p => totIngresado[p] > 0 || totSalido[p] > 0);
+  const items = (productosConMov.length > 0 ? productosConMov : PRODUCTOS).map(p => {
     const restante = stock[p] ?? 0;
     const negativo = restante < 0;
-    const color    = negativo ? 'var(--red)' : (restante === 0 && totIngresado[p] === 0 ? '#9ca3af' : 'var(--gray-dark)');
+    const color    = negativo ? 'var(--red)' : (totIngresado[p] === 0 ? '#9ca3af' : 'var(--gray-dark)');
     return `
     <div class="stock-item">
       <span class="si-icon">${ICONOS[p]}</span>
@@ -1135,6 +1137,8 @@ function renderDashboard() {
       ${negativo ? '<span class="si-alert">⚠️ Más entregado que ingresado</span>' : ''}
     </div>`;
   }).join('');
+
+  document.getElementById('dash-stock').innerHTML = aviso + items;
 
   // Últimas 8 salidas
   const ultimas = [...salidas].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,8);
@@ -1356,26 +1360,64 @@ function resetIngreso() {
 
 function renderStock() {
   const stock = calcStock();
+
+  // Totales globales por producto
   const totIng = {}, totSal = {};
   PRODUCTOS.forEach(p => { totIng[p] = 0; totSal[p] = 0; });
   ingresos.forEach(i => { totIng[i.producto] = (totIng[i.producto]||0) + (parseFloat(i.cantidad)||0); });
   salidas.forEach(s  => { totSal[s.producto]  = (totSal[s.producto]||0)  + (parseFloat(s.cantidad)||0); });
 
-  document.getElementById('stock-detalle').innerHTML = PRODUCTOS.map(p => {
+  // Desglose por campo para cada producto
+  const porcampo = {}; // porcampo[producto][campo] = cantidad ingresada
+  ingresos.forEach(i => {
+    const campo = i.origen || 'Sin campo';
+    if (!porcampo[i.producto]) porcampo[i.producto] = {};
+    porcampo[i.producto][campo] = (porcampo[i.producto][campo]||0) + (parseFloat(i.cantidad)||0);
+  });
+
+  // Actualizar datalist de campos
+  const todosLosCampos = [...new Set(ingresos.map(i => i.origen).filter(Boolean))];
+  const dl = document.getElementById('lista-campos');
+  if (dl) dl.innerHTML = todosLosCampos.map(c => `<option value="${esc(c)}">`).join('');
+
+  // Solo mostrar productos con movimientos
+  const productosActivos = PRODUCTOS.filter(p => totIng[p] > 0 || totSal[p] > 0);
+
+  if (productosActivos.length === 0) {
+    document.getElementById('stock-detalle').innerHTML =
+      `<p style="color:var(--gray);font-size:.9rem;grid-column:1/-1">Todavía no hay stock cargado. Usá el formulario de arriba para cargar la cosecha o hacienda disponible.</p>`;
+    return;
+  }
+
+  document.getElementById('stock-detalle').innerHTML = productosActivos.map(p => {
     const restante = stock[p] ?? 0;
     const negativo = restante < 0;
+
+    // Filas por campo
+    const camposHTML = porcampo[p]
+      ? Object.entries(porcampo[p]).map(([campo, cant]) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border);">
+            <span style="font-size:.78rem;color:#374151">📍 ${esc(campo)}</span>
+            <span style="font-size:.82rem;font-weight:700;color:var(--green-dark)">${fmtNum(cant)} ${UNIDADES[p]||''}</span>
+          </div>`).join('')
+      : '';
+
     return `
-    <div class="stock-item">
-      <span class="si-icon">${ICONOS[p]}</span>
-      <span class="si-name">${p}</span>
-      <span class="si-qty" style="color:${negativo ? 'var(--red)' : 'var(--gray-dark)'}">
-        ${fmtNum(restante)}
-      </span>
-      <span class="si-unit">${UNIDADES[p] || 'unidades'} disponibles</span>
-      <div style="margin-top:.6rem;font-size:.76rem;display:flex;flex-direction:column;gap:.2rem">
-        <span style="color:var(--green-dark)">▲ Ingresado: <strong>${fmtNum(totIng[p])}</strong></span>
-        <span style="color:var(--red)">▼ Entregado: <strong>${fmtNum(totSal[p])}</strong></span>
+    <div class="stock-item" style="grid-column: span 1">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <span class="si-icon">${ICONOS[p]}</span>
+          <span class="si-name" style="display:inline">${p}</span>
+        </div>
+        <span style="font-size:1.3rem;font-weight:800;color:${negativo?'var(--red)':'var(--green-dark)'}">
+          ${fmtNum(restante)} <small style="font-size:.65rem;font-weight:600">${UNIDADES[p]||''}</small>
+        </span>
       </div>
+      <div style="margin:.5rem 0;font-size:.75rem;display:flex;gap:.75rem">
+        <span style="color:var(--green-dark)">▲ ${fmtNum(totIng[p])} ingresado</span>
+        <span style="color:var(--red)">▼ ${fmtNum(totSal[p])} entregado</span>
+      </div>
+      ${camposHTML ? `<div style="margin-top:.4rem;border-top:1px solid var(--border);padding-top:.4rem"><span style="font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Por campo</span>${camposHTML}</div>` : ''}
       ${negativo ? '<span class="si-alert">⚠️ Más entregado que ingresado</span>' : ''}
     </div>`;
   }).join('');
