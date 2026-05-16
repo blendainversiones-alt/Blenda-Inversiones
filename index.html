@@ -377,6 +377,7 @@
   <div class="tab" onclick="showPage('salidas', this)">📤 Salidas a clientes</div>
   <div class="tab" onclick="showPage('stock', this)">📦 Stock</div>
   <div class="tab" onclick="showPage('clientes', this)">👥 Clientes</div>
+  <div class="tab" onclick="showPage('campos', this)">🗺️ Campos</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
 
@@ -755,6 +756,119 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════ CAMPOS ═══════════════════════════════ -->
+<div class="page" id="page-campos">
+  <div class="container">
+
+    <div class="card">
+      <h2>🗺️ Nuevo campo</h2>
+      <form id="form-campo">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="ca-nombre">Nombre del campo *</label>
+            <input id="ca-nombre" type="text" placeholder="Ej: Campo Norte, Lote 3" required />
+          </div>
+          <div class="form-group">
+            <label for="ca-tipo">Tipo</label>
+            <select id="ca-tipo">
+              <option value="Propio">Propio</option>
+              <option value="Alquilado">Alquilado</option>
+              <option value="En consignación">En consignación</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="ca-hectareas">Hectáreas</label>
+            <input id="ca-hectareas" type="number" min="0" step="any" placeholder="0" />
+          </div>
+          <div class="form-group">
+            <label for="ca-ubicacion">Ubicación / Localidad</label>
+            <input id="ca-ubicacion" type="text" placeholder="Ej: Ceres, Santa Fe" />
+          </div>
+          <div class="form-group">
+            <label for="ca-propietario">Propietario (si es alquilado)</label>
+            <input id="ca-propietario" type="text" placeholder="Nombre del dueño" />
+          </div>
+          <div class="form-group">
+            <label for="ca-vencimiento">Vencimiento contrato</label>
+            <input id="ca-vencimiento" type="date" />
+          </div>
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label for="ca-notas">Notas</label>
+            <textarea id="ca-notas" placeholder="Observaciones del campo…"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="resetCampo()">Limpiar</button>
+          <button type="submit" class="btn btn-primary">Guardar campo</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>📋 Campos registrados</h2>
+      <div class="toolbar">
+        <input id="ca-search" type="search" placeholder="Buscar campo…" oninput="renderCampos()" />
+        <select id="ca-filter-tipo" onchange="renderCampos()" style="width:auto;min-width:160px;">
+          <option value="">Todos los tipos</option>
+          <option value="Propio">Propio</option>
+          <option value="Alquilado">Alquilado</option>
+          <option value="En consignación">En consignación</option>
+        </select>
+        <button class="btn btn-blue btn-sm" onclick="exportCamposCSV()">Exportar CSV</button>
+      </div>
+      <div id="campos-grid" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Modal editar campo ── -->
+<div class="modal-backdrop" id="modal-campo">
+  <div class="modal">
+    <h3>✏️ Editar campo</h3>
+    <form id="form-edit-campo">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input id="ec2-nombre" type="text" required />
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="ec2-tipo">
+            <option value="Propio">Propio</option>
+            <option value="Alquilado">Alquilado</option>
+            <option value="En consignación">En consignación</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Hectáreas</label>
+          <input id="ec2-hectareas" type="number" min="0" step="any" />
+        </div>
+        <div class="form-group">
+          <label>Ubicación</label>
+          <input id="ec2-ubicacion" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Propietario</label>
+          <input id="ec2-propietario" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Vencimiento contrato</label>
+          <input id="ec2-vencimiento" type="date" />
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Notas</label>
+          <textarea id="ec2-notas"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-campo')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ── Modal editar salida ── -->
 <div class="modal-backdrop" id="modal-salida">
   <div class="modal">
@@ -924,9 +1038,10 @@ let salidas  = [];
 let ingresos = [];
 let clientes = [];
 let notas    = [];
+let campos   = [];
 
 // Contadores para saber cuándo todos los listeners cargaron por primera vez
-let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false };
+let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false };
 
 function checkLoaded() {
   return Object.values(_loaded).every(Boolean);
@@ -957,12 +1072,19 @@ db.collection('notas').orderBy('fecha','desc').onSnapshot(snap => {
   if (checkLoaded()) renderAll();
 });
 
+db.collection('campos').orderBy('nombre','asc').onSnapshot(snap => {
+  campos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.campos = true;
+  if (checkLoaded()) renderAll();
+});
+
 // ── helpers Firestore ──
 const COL = {
   salidas:  () => db.collection('salidas'),
   ingresos: () => db.collection('ingresos'),
   clientes: () => db.collection('clientes'),
   notas:    () => db.collection('notas'),
+  campos:   () => db.collection('campos'),
 };
 
 const PRODUCTOS = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría','Otro'];
@@ -1690,7 +1812,150 @@ function renderAll() {
   renderStock();
   renderMovimientos();
   renderClientes();
+  renderCampos();
   renderNotas();
+}
+
+// ═══════════════════════════════════════════
+//  CAMPOS
+// ═══════════════════════════════════════════
+
+let editCampoId = null;
+
+const TIPO_BADGE = { 'Propio':'b-green', 'Alquilado':'b-amber', 'En consignación':'b-blue' };
+
+document.getElementById('form-campo').addEventListener('submit', e => {
+  e.preventDefault();
+  const rec = {
+    nombre:      document.getElementById('ca-nombre').value.trim(),
+    tipo:        document.getElementById('ca-tipo').value,
+    hectareas:   parseFloat(document.getElementById('ca-hectareas').value) || 0,
+    ubicacion:   document.getElementById('ca-ubicacion').value.trim(),
+    propietario: document.getElementById('ca-propietario').value.trim(),
+    vencimiento: document.getElementById('ca-vencimiento').value,
+    notas:       document.getElementById('ca-notas').value.trim(),
+  };
+  COL.campos().add(rec).then(() => {
+    resetCampo();
+    toast('✅ Campo guardado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+});
+
+function resetCampo() { document.getElementById('form-campo').reset(); }
+
+function renderCampos() {
+  const q    = (document.getElementById('ca-search').value || '').toLowerCase();
+  const fTip = document.getElementById('ca-filter-tipo').value;
+
+  // Actualizar datalist para ingresos
+  const dl = document.getElementById('lista-campos');
+  if (dl) dl.innerHTML = campos.map(c => `<option value="${esc(c.nombre)}">`).join('');
+
+  let rows = campos.filter(c => {
+    const match = !q || [c.nombre,c.ubicacion,c.propietario].some(v => String(v||'').toLowerCase().includes(q));
+    const tOk   = !fTip || c.tipo === fTip;
+    return match && tOk;
+  });
+
+  const grid = document.getElementById('campos-grid');
+  if (rows.length === 0) {
+    grid.innerHTML = `<p class="empty-msg" style="grid-column:1/-1">No hay campos registrados aún.</p>`;
+    return;
+  }
+
+  // Stock por campo
+  const stockPorCampo = {};
+  ingresos.forEach(i => {
+    const campo = i.origen || '';
+    if (!stockPorCampo[campo]) stockPorCampo[campo] = [];
+    const idx = stockPorCampo[campo].findIndex(x => x.producto === i.producto);
+    if (idx >= 0) stockPorCampo[campo][idx].cantidad += parseFloat(i.cantidad)||0;
+    else stockPorCampo[campo].push({ producto: i.producto, cantidad: parseFloat(i.cantidad)||0, unidad: i.unidad||UNIDADES[i.producto]||'' });
+  });
+
+  grid.innerHTML = rows.map(c => {
+    const hoy      = todayISO();
+    const vence    = c.vencimiento;
+    const vencido  = vence && vence < hoy;
+    const proxVence = vence && !vencido && vence <= new Date(Date.now() + 60*24*3600*1000).toISOString().slice(0,10);
+    const stockItems = (stockPorCampo[c.nombre] || []);
+
+    const stockHTML = stockItems.length
+      ? stockItems.map(s => `<span style="font-size:.75rem;background:var(--green-light);color:var(--green-dark);padding:.15rem .45rem;border-radius:99px;font-weight:700">${ICONOS[s.producto]||''} ${fmtNum(s.cantidad)} ${s.unidad}</span>`).join(' ')
+      : `<span style="font-size:.75rem;color:var(--gray)">Sin stock cargado</span>`;
+
+    return `
+    <div style="background:#fff;border-radius:10px;padding:1.1rem 1.2rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.55rem;border-left:4px solid var(--green)">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.4rem">
+        <strong style="font-size:1rem">📍 ${esc(c.nombre)}</strong>
+        <span class="badge ${TIPO_BADGE[c.tipo]||'b-gray'}">${esc(c.tipo)}</span>
+      </div>
+      <div style="font-size:.8rem;color:#4b5563;display:flex;flex-direction:column;gap:.2rem">
+        ${c.hectareas ? `<span>🌿 <strong>${fmtNum(c.hectareas)}</strong> hectáreas</span>` : ''}
+        ${c.ubicacion ? `<span>📌 ${esc(c.ubicacion)}</span>` : ''}
+        ${c.propietario ? `<span>👤 ${esc(c.propietario)}</span>` : ''}
+        ${vence ? `<span style="color:${vencido?'var(--red)':proxVence?'var(--amber)':'#374151'}">
+          📅 Vence: ${fmtDate(vence)} ${vencido?'⚠️ VENCIDO':proxVence?'⚠️ Próximo a vencer':''}
+        </span>` : ''}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:.3rem;align-items:center">
+        <span style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-right:.2rem">Stock:</span>
+        ${stockHTML}
+      </div>
+      ${c.notas ? `<p style="font-size:.78rem;color:#6b7280;font-style:italic">${esc(c.notas)}</p>` : ''}
+      <div style="display:flex;gap:.5rem;margin-top:.25rem">
+        <button class="btn btn-secondary btn-sm" onclick="openEditCampo('${c.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCampo('${c.id}')">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openEditCampo(id) {
+  const c = campos.find(x => x.id === id);
+  if (!c) return;
+  editCampoId = id;
+  document.getElementById('ec2-nombre').value      = c.nombre;
+  document.getElementById('ec2-tipo').value        = c.tipo;
+  document.getElementById('ec2-hectareas').value   = c.hectareas || '';
+  document.getElementById('ec2-ubicacion').value   = c.ubicacion || '';
+  document.getElementById('ec2-propietario').value = c.propietario || '';
+  document.getElementById('ec2-vencimiento').value = c.vencimiento || '';
+  document.getElementById('ec2-notas').value       = c.notas || '';
+  document.getElementById('modal-campo').classList.add('open');
+}
+
+document.getElementById('form-edit-campo').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!editCampoId) return;
+  const data = {
+    nombre:      document.getElementById('ec2-nombre').value.trim(),
+    tipo:        document.getElementById('ec2-tipo').value,
+    hectareas:   parseFloat(document.getElementById('ec2-hectareas').value) || 0,
+    ubicacion:   document.getElementById('ec2-ubicacion').value.trim(),
+    propietario: document.getElementById('ec2-propietario').value.trim(),
+    vencimiento: document.getElementById('ec2-vencimiento').value,
+    notas:       document.getElementById('ec2-notas').value.trim(),
+  };
+  COL.campos().doc(editCampoId).update(data).then(() => {
+    closeModal('modal-campo');
+    toast('✅ Campo actualizado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+});
+
+function deleteCampo(id) {
+  if (!confirm('¿Eliminar este campo?')) return;
+  COL.campos().doc(id).delete().then(() => toast('🗑️ Campo eliminado'))
+    .catch(() => toast('❌ Error al eliminar.'));
+}
+
+function exportCamposCSV() {
+  if (!campos.length) { toast('No hay campos'); return; }
+  const cols = ['Nombre','Tipo','Hectáreas','Ubicación','Propietario','Vencimiento','Notas'];
+  const data = campos.map(c => [c.nombre,c.tipo,c.hectareas,c.ubicacion,c.propietario,c.vencimiento,c.notas]
+    .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
+  downloadCSV([cols.join(','), ...data].join('\r\n'), `campos_blenda_${todayISO()}.csv`);
+  toast('📄 CSV exportado');
 }
 
 // ── Boot: los listeners de Firestore arrancan solos y llaman renderAll() cuando cargan ──
