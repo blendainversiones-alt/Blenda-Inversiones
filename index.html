@@ -1105,17 +1105,36 @@ function renderDashboard() {
     </div>
   `;
 
-  // Stock cards
-  const colores = ['sc-green','sc-green','sc-amber','sc-blue','sc-blue','sc-gray'];
-  document.getElementById('dash-stock').innerHTML = PRODUCTOS.map((p,i) => `
+  // Stock cards con detalle ingresado / salido / restante
+  const sinStock = ingresos.length === 0 && salidas.length > 0;
+
+  // Calcular totales por producto
+  const totIngresado = {}, totSalido = {};
+  PRODUCTOS.forEach(p => { totIngresado[p] = 0; totSalido[p] = 0; });
+  ingresos.forEach(i => { totIngresado[i.producto] = (totIngresado[i.producto]||0) + (parseFloat(i.cantidad)||0); });
+  salidas.forEach(s  => { totSalido[s.producto]   = (totSalido[s.producto]||0)   + (parseFloat(s.cantidad)||0); });
+
+  const aviso = sinStock
+    ? `<div class="alert-banner" style="margin-bottom:1rem">📥 Para ver el stock restante, primero cargá el stock disponible en la pestaña <strong>📦 Stock → Cargar ingreso</strong>.</div>`
+    : '';
+
+  document.getElementById('dash-stock').innerHTML = aviso + PRODUCTOS.map(p => {
+    const restante = stock[p] ?? 0;
+    const negativo = restante < 0;
+    const color    = negativo ? 'var(--red)' : (restante === 0 && totIngresado[p] === 0 ? '#9ca3af' : 'var(--gray-dark)');
+    return `
     <div class="stock-item">
       <span class="si-icon">${ICONOS[p]}</span>
       <span class="si-name">${p}</span>
-      <span class="si-qty">${fmtNum(stock[p] ?? 0)}</span>
-      <span class="si-unit">${UNIDADES[p] || 'unidades'}</span>
-      ${(stock[p] ?? 0) < 0 ? '<span class="si-alert">⚠️ Stock negativo</span>' : ''}
-    </div>
-  `).join('');
+      <span class="si-qty" style="color:${color}">${fmtNum(restante)}</span>
+      <span class="si-unit">${UNIDADES[p] || 'unidades'} disponibles</span>
+      <div style="margin-top:.5rem;font-size:.75rem;display:flex;gap:.5rem;flex-wrap:wrap">
+        <span style="color:var(--green-dark)">▲ ${fmtNum(totIngresado[p])} ingresado</span>
+        <span style="color:var(--red)">▼ ${fmtNum(totSalido[p])} entregado</span>
+      </div>
+      ${negativo ? '<span class="si-alert">⚠️ Más entregado que ingresado</span>' : ''}
+    </div>`;
+  }).join('');
 
   // Últimas 8 salidas
   const ultimas = [...salidas].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,8);
@@ -1337,17 +1356,29 @@ function resetIngreso() {
 
 function renderStock() {
   const stock = calcStock();
-  document.getElementById('stock-detalle').innerHTML = PRODUCTOS.map(p => `
+  const totIng = {}, totSal = {};
+  PRODUCTOS.forEach(p => { totIng[p] = 0; totSal[p] = 0; });
+  ingresos.forEach(i => { totIng[i.producto] = (totIng[i.producto]||0) + (parseFloat(i.cantidad)||0); });
+  salidas.forEach(s  => { totSal[s.producto]  = (totSal[s.producto]||0)  + (parseFloat(s.cantidad)||0); });
+
+  document.getElementById('stock-detalle').innerHTML = PRODUCTOS.map(p => {
+    const restante = stock[p] ?? 0;
+    const negativo = restante < 0;
+    return `
     <div class="stock-item">
       <span class="si-icon">${ICONOS[p]}</span>
       <span class="si-name">${p}</span>
-      <span class="si-qty" style="color:${(stock[p]||0) < 0 ? 'var(--red)' : 'var(--gray-dark)'}">
-        ${fmtNum(stock[p] ?? 0)}
+      <span class="si-qty" style="color:${negativo ? 'var(--red)' : 'var(--gray-dark)'}">
+        ${fmtNum(restante)}
       </span>
-      <span class="si-unit">${UNIDADES[p] || 'unidades'}</span>
-      ${(stock[p] ?? 0) < 0 ? '<span class="si-alert">⚠️ Stock negativo</span>' : ''}
-    </div>
-  `).join('');
+      <span class="si-unit">${UNIDADES[p] || 'unidades'} disponibles</span>
+      <div style="margin-top:.6rem;font-size:.76rem;display:flex;flex-direction:column;gap:.2rem">
+        <span style="color:var(--green-dark)">▲ Ingresado: <strong>${fmtNum(totIng[p])}</strong></span>
+        <span style="color:var(--red)">▼ Entregado: <strong>${fmtNum(totSal[p])}</strong></span>
+      </div>
+      ${negativo ? '<span class="si-alert">⚠️ Más entregado que ingresado</span>' : ''}
+    </div>`;
+  }).join('');
 }
 
 function renderMovimientos() {
