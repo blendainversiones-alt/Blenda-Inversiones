@@ -1251,7 +1251,7 @@ function sortSalidas(key) {
 }
 
 function openEditSalida(id) {
-  const r = DB.salidas.find(x => x.id === id);
+  const r = salidas.find(x => x.id === id);
   if (!r) return;
   editSalidaId = id;
   document.getElementById('es-fecha').value    = r.fecha;
@@ -1433,7 +1433,7 @@ function renderClientes() {
 
   // Datalist autocomplete
   const dl = document.getElementById('lista-clientes');
-  dl.innerHTML = DB.clientes.map(c => `<option value="${esc(c.nombre)}">`).join('');
+  dl.innerHTML = clientes.map(c => `<option value="${esc(c.nombre)}">`).join('');
 
   const tbody = document.getElementById('tabla-clientes');
   if (rows.length === 0) {
@@ -1460,7 +1460,7 @@ function renderClientes() {
 }
 
 function openEditCliente(id) {
-  const c = DB.clientes.find(x => x.id === id);
+  const c = clientes.find(x => x.id === id);
   if (!c) return;
   editClienteId = id;
   document.getElementById('ec-nombre').value    = c.nombre;
@@ -1566,7 +1566,7 @@ function renderNotas() {
 }
 
 function openEditNota(id) {
-  const n = DB.notas.find(x => x.id === id);
+  const n = notas.find(x => x.id === id);
   if (!n) return;
   editNotaId = id;
   document.getElementById('en-titulo').value    = n.titulo;
