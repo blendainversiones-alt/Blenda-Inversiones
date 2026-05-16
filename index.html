@@ -894,27 +894,77 @@
 
 <div id="toast"></div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script>
 // ═══════════════════════════════════════════
-//  DATA LAYER
+//  FIREBASE INIT
 // ═══════════════════════════════════════════
 
-const DB = {
-  KEY_SALIDAS:    'blenda_salidas_v1',
-  KEY_INGRESOS:   'blenda_ingresos_v1',
-  KEY_CLIENTES:   'blenda_clientes_v1',
-  KEY_NOTAS:      'blenda_notas_v1',
-
-  get salidas()   { return JSON.parse(localStorage.getItem(this.KEY_SALIDAS)   || '[]'); },
-  get ingresos()  { return JSON.parse(localStorage.getItem(this.KEY_INGRESOS)  || '[]'); },
-  get clientes()  { return JSON.parse(localStorage.getItem(this.KEY_CLIENTES)  || '[]'); },
-  get notas()     { return JSON.parse(localStorage.getItem(this.KEY_NOTAS)     || '[]'); },
-
-  saveSalidas(d)   { localStorage.setItem(this.KEY_SALIDAS,   JSON.stringify(d)); },
-  saveIngresos(d)  { localStorage.setItem(this.KEY_INGRESOS,  JSON.stringify(d)); },
-  saveClientes(d)  { localStorage.setItem(this.KEY_CLIENTES,  JSON.stringify(d)); },
-  saveNotas(d)     { localStorage.setItem(this.KEY_NOTAS,     JSON.stringify(d)); },
+const firebaseConfig = {
+  apiKey: "AIzaSyBmE41ULJEWcDgbtlQUlDBVLxCbYIM4r1c",
+  authDomain: "blenda-hnos.firebaseapp.com",
+  projectId: "blenda-hnos",
+  storageBucket: "blenda-hnos.firebasestorage.app",
+  messagingSenderId: "156331346608",
+  appId: "1:156331346608:web:ac562d898b645019de4975"
 };
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ═══════════════════════════════════════════
+//  ESTADO LOCAL (sincronizado por Firestore)
+// ═══════════════════════════════════════════
+
+let salidas  = [];
+let ingresos = [];
+let clientes = [];
+let notas    = [];
+
+// Contadores para saber cuándo todos los listeners cargaron por primera vez
+let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false };
+
+function checkLoaded() {
+  return Object.values(_loaded).every(Boolean);
+}
+
+// ── Listeners en tiempo real ──
+db.collection('salidas').orderBy('fecha','desc').onSnapshot(snap => {
+  salidas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.salidas = true;
+  if (checkLoaded()) renderAll();
+});
+
+db.collection('ingresos').orderBy('fecha','desc').onSnapshot(snap => {
+  ingresos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.ingresos = true;
+  if (checkLoaded()) renderAll();
+});
+
+db.collection('clientes').orderBy('nombre','asc').onSnapshot(snap => {
+  clientes = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.clientes = true;
+  if (checkLoaded()) renderAll();
+});
+
+db.collection('notas').orderBy('fecha','desc').onSnapshot(snap => {
+  notas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.notas = true;
+  if (checkLoaded()) renderAll();
+});
+
+// ── helpers Firestore ──
+const COL = {
+  salidas:  () => db.collection('salidas'),
+  ingresos: () => db.collection('ingresos'),
+  clientes: () => db.collection('clientes'),
+  notas:    () => db.collection('notas'),
+};
+
+}; // (DB object vacío — se usa estado local sincronizado por Firestore)
 
 const PRODUCTOS = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría','Otro'];
 const UNIDADES  = { 'Maíz':'toneladas', 'Soja':'toneladas', 'Trigo':'toneladas',
@@ -992,12 +1042,12 @@ function calcStock() {
   const stock = {};
   PRODUCTOS.forEach(p => stock[p] = 0);
 
-  DB.ingresos.forEach(i => {
+  ingresos.forEach(i => {
     if (stock[i.producto] !== undefined) stock[i.producto] += parseFloat(i.cantidad) || 0;
     else stock[i.producto] = parseFloat(i.cantidad) || 0;
   });
 
-  DB.salidas.forEach(s => {
+  salidas.forEach(s => {
     if (stock[s.producto] !== undefined) stock[s.producto] -= parseFloat(s.cantidad) || 0;
     else stock[s.producto] = -(parseFloat(s.cantidad) || 0);
   });
@@ -1010,8 +1060,7 @@ function calcStock() {
 // ═══════════════════════════════════════════
 
 function renderDashboard() {
-  const salidas  = DB.salidas;
-  const stock    = calcStock();
+  const stock = calcStock();
   const today    = todayISO();
   const thisMonth = today.slice(0,7);
 
@@ -1028,7 +1077,7 @@ function renderDashboard() {
   const hoy = salidas.filter(s => s.fecha === today).length;
   const mes  = salidas.filter(s => s.fecha?.startsWith(thisMonth)).length;
   const pendientes = salidas.filter(s => s.estado === 'Pendiente').length;
-  const clientes = new Set(salidas.map(s => s.cliente?.toLowerCase())).size;
+  const nClientes = new Set(salidas.map(s => s.cliente?.toLowerCase())).size;
 
   document.getElementById('dash-stats').innerHTML = `
     <div class="stat-card sc-green">
@@ -1053,7 +1102,7 @@ function renderDashboard() {
     </div>
     <div class="stat-card sc-blue">
       <span class="s-label">Clientes activos</span>
-      <span class="s-val">${clientes}</span>
+      <span class="s-val">${nClientes}</span>
       <span class="s-sub">con salidas registradas</span>
     </div>
   `;
@@ -1071,7 +1120,7 @@ function renderDashboard() {
   `).join('');
 
   // Últimas 8 salidas
-  const ultimas = [...salidas].sort((a,b) => b.fecha?.localeCompare(a.fecha)).slice(0,8);
+  const ultimas = [...salidas].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,8);
   const tbody = document.getElementById('dash-table');
   if (ultimas.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" class="empty-msg">No hay salidas registradas aún.</td></tr>`;
@@ -1119,7 +1168,6 @@ function updateUnidadIngreso() {
 document.getElementById('form-salida').addEventListener('submit', e => {
   e.preventDefault();
   const rec = {
-    id:       uid(),
     fecha:    document.getElementById('s-fecha').value,
     cliente:  document.getElementById('s-cliente').value.trim(),
     producto: document.getElementById('s-producto').value,
@@ -1130,21 +1178,19 @@ document.getElementById('form-salida').addEventListener('submit', e => {
     precio:   parseFloat(document.getElementById('s-precio').value) || 0,
     estado:   document.getElementById('s-estado').value,
     notas:    document.getElementById('s-notas').value.trim(),
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
   // Auto-agregar cliente si no existe
-  const clientes = DB.clientes;
-  if (!clientes.find(c => c.nombre.toLowerCase() === rec.cliente.toLowerCase())) {
-    clientes.push({ id: uid(), nombre: rec.cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' });
-    DB.saveClientes(clientes);
+  const nombreCliente = rec.cliente.toLowerCase();
+  if (!clientes.find(c => c.nombre.toLowerCase() === nombreCliente)) {
+    COL.clientes().add({ nombre: rec.cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' });
   }
 
-  const salidas = DB.salidas;
-  salidas.unshift(rec);
-  DB.saveSalidas(salidas);
-  renderAll();
-  resetSalida();
-  toast('✅ Salida registrada correctamente', '#14532d');
+  COL.salidas().add(rec).then(() => {
+    resetSalida();
+    toast('✅ Salida registrada correctamente', '#14532d');
+  }).catch(() => toast('❌ Error al guardar. Revisá la conexión.'));
 });
 
 function resetSalida() {
@@ -1158,7 +1204,7 @@ function renderSalidas() {
   const fProd = document.getElementById('s-filter-prod').value;
   const fEst  = document.getElementById('s-filter-estado').value;
 
-  let rows = DB.salidas.filter(r => {
+  let rows = salidas.filter(r => {
     const match = !q || [r.cliente,r.producto,r.remito,r.notas].some(v => String(v||'').toLowerCase().includes(q));
     const pOk   = !fProd || r.producto === fProd;
     const eOk   = !fEst  || r.estado === fEst;
@@ -1225,11 +1271,8 @@ function openEditSalida(id) {
 
 document.getElementById('form-edit-salida').addEventListener('submit', e => {
   e.preventDefault();
-  const salidas = DB.salidas;
-  const idx = salidas.findIndex(r => r.id === editSalidaId);
-  if (idx === -1) return;
-  salidas[idx] = {
-    ...salidas[idx],
+  if (!editSalidaId) return;
+  const data = {
     fecha:    document.getElementById('es-fecha').value,
     cliente:  document.getElementById('es-cliente').value.trim(),
     producto: document.getElementById('es-producto').value,
@@ -1241,22 +1284,20 @@ document.getElementById('form-edit-salida').addEventListener('submit', e => {
     estado:   document.getElementById('es-estado').value,
     notas:    document.getElementById('es-notas').value.trim(),
   };
-  DB.saveSalidas(salidas);
-  closeModal('modal-salida');
-  renderAll();
-  toast('✅ Salida actualizada', '#14532d');
+  COL.salidas().doc(editSalidaId).update(data).then(() => {
+    closeModal('modal-salida');
+    toast('✅ Salida actualizada', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
 });
 
 function deleteSalida(id) {
   if (!confirm('¿Eliminar esta salida?')) return;
-  const salidas = DB.salidas.filter(r => r.id !== id);
-  DB.saveSalidas(salidas);
-  renderAll();
-  toast('🗑️ Salida eliminada');
+  COL.salidas().doc(id).delete().then(() => toast('🗑️ Salida eliminada'))
+    .catch(() => toast('❌ Error al eliminar.'));
 }
 
 function exportSalidasCSV() {
-  const rows = DB.salidas;
+  const rows = salidas;
   if (!rows.length) { toast('No hay salidas para exportar'); return; }
   const cols = ['Fecha','Cliente','Producto','Cantidad','Unidad','Precio Unitario','Total','Patente','Remito','Estado','Notas'];
   const data = rows.map(r => [
@@ -1277,20 +1318,18 @@ document.getElementById('i-fecha').value = todayISO();
 document.getElementById('form-ingreso').addEventListener('submit', e => {
   e.preventDefault();
   const rec = {
-    id:       uid(),
     fecha:    document.getElementById('i-fecha').value,
     producto: document.getElementById('i-producto').value,
     cantidad: parseFloat(document.getElementById('i-cantidad').value) || 0,
     unidad:   document.getElementById('i-unidad').value.trim(),
     origen:   document.getElementById('i-origen').value.trim(),
     notas:    document.getElementById('i-notas').value.trim(),
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
   };
-  const ingresos = DB.ingresos;
-  ingresos.unshift(rec);
-  DB.saveIngresos(ingresos);
-  renderAll();
-  resetIngreso();
-  toast('✅ Ingreso registrado', '#14532d');
+  COL.ingresos().add(rec).then(() => {
+    resetIngreso();
+    toast('✅ Ingreso registrado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
 });
 
 function resetIngreso() {
@@ -1318,9 +1357,9 @@ function renderMovimientos() {
   const fProd = document.getElementById('m-filter-prod').value;
   const fTipo = document.getElementById('m-filter-tipo').value;
 
-  const ingresos = DB.ingresos.map(i => ({ ...i, tipo: 'Ingreso', ref: i.origen || '—' }));
-  const salidas  = DB.salidas.map(s => ({ ...s, tipo: 'Salida', ref: s.remito || s.cliente || '—' }));
-  let rows = [...ingresos, ...salidas];
+  const movIngresos = ingresos.map(i => ({ ...i, tipo: 'Ingreso', ref: i.origen || '—' }));
+  const movSalidas  = salidas.map(s => ({ ...s, tipo: 'Salida', ref: s.remito || s.cliente || '—' }));
+  let rows = [...movIngresos, ...movSalidas];
 
   rows.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
 
@@ -1351,9 +1390,10 @@ function renderMovimientos() {
 }
 
 function exportMovimientosCSV() {
-  const ingresos = DB.ingresos.map(i => ({ ...i, tipo: 'Ingreso' }));
-  const salidas  = DB.salidas.map(s => ({ ...s, tipo: 'Salida' }));
-  const rows = [...ingresos, ...salidas].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+  const rows = [
+    ...ingresos.map(i => ({ ...i, tipo: 'Ingreso' })),
+    ...salidas.map(s => ({ ...s, tipo: 'Salida' }))
+  ].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
   if (!rows.length) { toast('No hay movimientos'); return; }
   const cols = ['Fecha','Tipo','Producto','Cantidad','Unidad','Notas'];
   const data = rows.map(r => [r.fecha, r.tipo, r.producto, r.cantidad, r.unidad, r.notas]
@@ -1371,7 +1411,6 @@ let editClienteId = null;
 document.getElementById('form-cliente').addEventListener('submit', e => {
   e.preventDefault();
   const rec = {
-    id:        uid(),
     nombre:    document.getElementById('c-nombre').value.trim(),
     cuit:      document.getElementById('c-cuit').value.trim(),
     tel:       document.getElementById('c-tel').value.trim(),
@@ -1379,21 +1418,18 @@ document.getElementById('form-cliente').addEventListener('submit', e => {
     localidad: document.getElementById('c-localidad').value.trim(),
     notas:     document.getElementById('c-notas').value.trim(),
   };
-  const clientes = DB.clientes;
-  clientes.unshift(rec);
-  DB.saveClientes(clientes);
-  renderAll();
-  resetCliente();
-  toast('✅ Cliente guardado', '#14532d');
+  COL.clientes().add(rec).then(() => {
+    resetCliente();
+    toast('✅ Cliente guardado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
 });
 
 function resetCliente() { document.getElementById('form-cliente').reset(); }
 
 function renderClientes() {
   const q = (document.getElementById('c-search').value || '').toLowerCase();
-  const salidas = DB.salidas;
 
-  let rows = DB.clientes.filter(c =>
+  let rows = clientes.filter(c =>
     !q || [c.nombre,c.cuit,c.tel,c.email,c.localidad].some(v => String(v||'').toLowerCase().includes(q))
   );
 
@@ -1440,11 +1476,8 @@ function openEditCliente(id) {
 
 document.getElementById('form-edit-cliente').addEventListener('submit', e => {
   e.preventDefault();
-  const clientes = DB.clientes;
-  const idx = clientes.findIndex(c => c.id === editClienteId);
-  if (idx === -1) return;
-  clientes[idx] = {
-    ...clientes[idx],
+  if (!editClienteId) return;
+  const data = {
     nombre:    document.getElementById('ec-nombre').value.trim(),
     cuit:      document.getElementById('ec-cuit').value.trim(),
     tel:       document.getElementById('ec-tel').value.trim(),
@@ -1452,21 +1485,20 @@ document.getElementById('form-edit-cliente').addEventListener('submit', e => {
     localidad: document.getElementById('ec-localidad').value.trim(),
     notas:     document.getElementById('ec-notas').value.trim(),
   };
-  DB.saveClientes(clientes);
-  closeModal('modal-cliente');
-  renderAll();
-  toast('✅ Cliente actualizado', '#14532d');
+  COL.clientes().doc(editClienteId).update(data).then(() => {
+    closeModal('modal-cliente');
+    toast('✅ Cliente actualizado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
 });
 
 function deleteCliente(id) {
   if (!confirm('¿Eliminar este cliente?')) return;
-  DB.saveClientes(DB.clientes.filter(c => c.id !== id));
-  renderAll();
-  toast('🗑️ Cliente eliminado');
+  COL.clientes().doc(id).delete().then(() => toast('🗑️ Cliente eliminado'))
+    .catch(() => toast('❌ Error al eliminar.'));
 }
 
 function exportClientesCSV() {
-  const rows = DB.clientes;
+  const rows = clientes;
   if (!rows.length) { toast('No hay clientes'); return; }
   const cols = ['Nombre','CUIT/DNI','Teléfono','Email','Localidad'];
   const data = rows.map(c => [c.nombre,c.cuit,c.tel,c.email,c.localidad]
@@ -1489,18 +1521,16 @@ const NOTA_BADGE = {
 document.getElementById('form-nota').addEventListener('submit', e => {
   e.preventDefault();
   const rec = {
-    id:        uid(),
     fecha:     todayISO(),
     titulo:    document.getElementById('n-titulo').value.trim(),
     categoria: document.getElementById('n-categoria').value,
     texto:     document.getElementById('n-texto').value.trim(),
+    creadoEn:  firebase.firestore.FieldValue.serverTimestamp(),
   };
-  const notas = DB.notas;
-  notas.unshift(rec);
-  DB.saveNotas(notas);
-  renderAll();
-  resetNota();
-  toast('✅ Nota guardada', '#14532d');
+  COL.notas().add(rec).then(() => {
+    resetNota();
+    toast('✅ Nota guardada', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
 });
 
 function resetNota() { document.getElementById('form-nota').reset(); }
@@ -1509,7 +1539,7 @@ function renderNotas() {
   const q    = (document.getElementById('nt-search').value || '').toLowerCase();
   const fCat = document.getElementById('nt-filter').value;
 
-  let rows = DB.notas.filter(n => {
+  let rows = notas.filter(n => {
     const match = !q || [n.titulo,n.texto,n.categoria].some(v => String(v||'').toLowerCase().includes(q));
     const cOk   = !fCat || n.categoria === fCat;
     return match && cOk;
@@ -1549,26 +1579,22 @@ function openEditNota(id) {
 
 document.getElementById('form-edit-nota').addEventListener('submit', e => {
   e.preventDefault();
-  const notas = DB.notas;
-  const idx = notas.findIndex(n => n.id === editNotaId);
-  if (idx === -1) return;
-  notas[idx] = {
-    ...notas[idx],
+  if (!editNotaId) return;
+  const data = {
     titulo:    document.getElementById('en-titulo').value.trim(),
     categoria: document.getElementById('en-categoria').value,
     texto:     document.getElementById('en-texto').value.trim(),
   };
-  DB.saveNotas(notas);
-  closeModal('modal-nota');
-  renderAll();
-  toast('✅ Nota actualizada', '#14532d');
+  COL.notas().doc(editNotaId).update(data).then(() => {
+    closeModal('modal-nota');
+    toast('✅ Nota actualizada', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
 });
 
 function deleteNota(id) {
   if (!confirm('¿Eliminar esta nota?')) return;
-  DB.saveNotas(DB.notas.filter(n => n.id !== id));
-  renderAll();
-  toast('🗑️ Nota eliminada');
+  COL.notas().doc(id).delete().then(() => toast('🗑️ Nota eliminada'))
+    .catch(() => toast('❌ Error al eliminar.'));
 }
 
 // ═══════════════════════════════════════════
@@ -1596,8 +1622,7 @@ function renderAll() {
   renderNotas();
 }
 
-// ── Boot ──
-renderAll();
+// ── Boot: los listeners de Firestore arrancan solos y llaman renderAll() cuando cargan ──
 </script>
 </body>
 </html>
