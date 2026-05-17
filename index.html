@@ -71,6 +71,18 @@
     .tab:hover  { color: var(--green); }
     .tab.active { color: var(--green-dark); border-bottom-color: var(--green); }
 
+    /* ── Sub-tabs (dentro de Tablas) ── */
+    .sub-nav { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.25rem; }
+    .sub-tab {
+      padding:.45rem 1.1rem; border-radius:20px; font-size:.84rem; font-weight:600;
+      cursor:pointer; background:var(--gray-light); color:var(--gray);
+      border:none; transition:background .15s, color .15s;
+    }
+    .sub-tab:hover { background:#d1fae5; color:var(--green-dark); }
+    .sub-tab.active { background:var(--green-dark); color:#fff; }
+    .sub-section { display:none; }
+    .sub-section.active { display:block; }
+
     /* ── Layout ── */
     .page { display: none; }
     .page.active { display: block; }
@@ -374,10 +386,9 @@
 
 <nav>
   <div class="tab active" onclick="showPage('dashboard', this)">📊 Inicio</div>
-  <div class="tab" onclick="showPage('salidas', this)">📤 Salidas a clientes</div>
-  <div class="tab" onclick="showPage('stock', this)">📦 Stock</div>
-  <div class="tab" onclick="showPage('clientes', this)">👥 Clientes</div>
-  <div class="tab" onclick="showPage('campos', this)">🗺️ Campos</div>
+  <div class="tab" onclick="showPage('stock', this)">📥 Ingresos</div>
+  <div class="tab" onclick="showPage('salidas', this)">📤 Egresos</div>
+  <div class="tab" onclick="showPage('tablas', this)">📋 Tablas</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
 
@@ -387,18 +398,15 @@
 
     <div id="alert-container"></div>
 
-    <!-- Stats -->
-    <div class="stats" id="dash-stats"></div>
-
-    <!-- Stock rápido -->
+    <!-- Stock por producto -->
     <div class="card">
       <h2>📦 Stock actual</h2>
       <div class="stock-grid" id="dash-stock"></div>
     </div>
 
-    <!-- Cotizaciones -->
+    <!-- Cotizaciones + Flete + Valorización -->
     <div class="card">
-      <h2>📈 Cotizaciones del día</h2>
+      <h2>📈 Precios del día</h2>
       <div id="cotizaciones-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
         <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando cotizaciones…</div>
       </div>
@@ -412,32 +420,10 @@
       <!-- Valorización neta -->
       <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.75rem">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-          <span style="font-size:.8rem;font-weight:700;color:var(--gray)">💰 VALORIZACIÓN NETA DEL STOCK</span>
+          <span style="font-size:.8rem;font-weight:700;color:var(--gray)">💰 STOCK VALORIZADO (precio neto)</span>
           <span id="valor-total-stock" style="font-size:1rem;font-weight:800;color:var(--green-dark)">—</span>
         </div>
         <div id="valor-detalle-stock" style="margin-top:.5rem;font-size:.8rem;color:#4b5563"></div>
-      </div>
-    </div>
-
-    <!-- Últimas salidas -->
-    <div class="card">
-      <h2>📤 Últimas salidas</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Fecha</th>
-              <th>Cliente</th>
-              <th>Producto</th>
-              <th>Cantidad</th>
-              <th>Campo carga</th>
-              <th>Patente</th>
-              <th>Remito</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody id="dash-table"></tbody>
-        </table>
       </div>
     </div>
 
@@ -605,7 +591,8 @@
           </div>
           <div class="form-group" id="grp-proveedor" style="display:none">
             <label for="i-proveedor">Proveedor</label>
-            <input id="i-proveedor" type="text" placeholder="Nombre del proveedor" />
+            <input id="i-proveedor" type="text" placeholder="Nombre del proveedor" list="lista-proveedores" />
+            <datalist id="lista-proveedores"></datalist>
           </div>
           <div class="form-group">
             <label for="i-cantidad">Cantidad *</label>
@@ -680,70 +667,205 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════ CLIENTES ═══════════════════════════════ -->
-<div class="page" id="page-clientes">
+<!-- ═══════════════════════════════ TABLAS ═══════════════════════════════ -->
+<div class="page" id="page-tablas">
   <div class="container">
 
     <div class="card">
-      <h2>👥 Nuevo cliente</h2>
-      <form id="form-cliente">
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="c-nombre">Nombre / Razón social *</label>
-            <input id="c-nombre" type="text" placeholder="Nombre del cliente" required />
-          </div>
-          <div class="form-group">
-            <label for="c-cuit">CUIT / DNI</label>
-            <input id="c-cuit" type="text" placeholder="Ej: 20-12345678-9" />
-          </div>
-          <div class="form-group">
-            <label for="c-tel">Teléfono</label>
-            <input id="c-tel" type="text" placeholder="Ej: +54 9 11 1234-5678" />
-          </div>
-          <div class="form-group">
-            <label for="c-email">Email</label>
-            <input id="c-email" type="email" placeholder="correo@ejemplo.com" />
-          </div>
-          <div class="form-group">
-            <label for="c-localidad">Localidad</label>
-            <input id="c-localidad" type="text" placeholder="Ciudad / Localidad" />
-          </div>
-          <div class="form-group" style="grid-column: 1 / -1;">
-            <label for="c-notas">Notas</label>
-            <textarea id="c-notas" placeholder="Observaciones sobre el cliente…"></textarea>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" onclick="resetCliente()">Limpiar</button>
-          <button type="submit" class="btn btn-primary">Guardar cliente</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>📋 Listado de clientes</h2>
-      <div class="toolbar">
-        <input id="c-search" type="search" placeholder="Buscar cliente…" oninput="renderClientes()" />
-        <button class="btn btn-blue btn-sm" onclick="exportClientesCSV()">Exportar CSV</button>
+      <!-- Sub-nav -->
+      <div class="sub-nav">
+        <button class="sub-tab active" onclick="showTabla('clientes', this)">👥 Clientes</button>
+        <button class="sub-tab" onclick="showTabla('campos', this)">🗺️ Campos</button>
+        <button class="sub-tab" onclick="showTabla('proveedores', this)">🚚 Proveedores</button>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>CUIT / DNI</th>
-              <th>Teléfono</th>
-              <th>Email</th>
-              <th>Localidad</th>
-              <th>Total salidas</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-clientes"></tbody>
-        </table>
-      </div>
-    </div>
 
+      <!-- ── Clientes ── -->
+      <div class="sub-section active" id="subtab-clientes">
+        <h2 style="margin-bottom:1rem">👥 Nuevo cliente</h2>
+        <form id="form-cliente">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="c-nombre">Nombre / Razón social *</label>
+              <input id="c-nombre" type="text" placeholder="Nombre del cliente" required />
+            </div>
+            <div class="form-group">
+              <label for="c-cuit">CUIT / DNI</label>
+              <input id="c-cuit" type="text" placeholder="Ej: 20-12345678-9" />
+            </div>
+            <div class="form-group">
+              <label for="c-tel">Teléfono</label>
+              <input id="c-tel" type="text" placeholder="Ej: +54 9 11 1234-5678" />
+            </div>
+            <div class="form-group">
+              <label for="c-email">Email</label>
+              <input id="c-email" type="email" placeholder="correo@ejemplo.com" />
+            </div>
+            <div class="form-group">
+              <label for="c-localidad">Localidad</label>
+              <input id="c-localidad" type="text" placeholder="Ciudad / Localidad" />
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label for="c-notas">Notas</label>
+              <textarea id="c-notas" placeholder="Observaciones sobre el cliente…"></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="resetCliente()">Limpiar</button>
+            <button type="submit" class="btn btn-primary">Guardar cliente</button>
+          </div>
+        </form>
+
+        <hr style="margin:1.5rem 0;border:none;border-top:1px solid var(--border)" />
+
+        <h2 style="margin-bottom:1rem">📋 Listado de clientes</h2>
+        <div class="toolbar">
+          <input id="c-search" type="search" placeholder="Buscar cliente…" oninput="renderClientes()" />
+          <button class="btn btn-blue btn-sm" onclick="exportClientesCSV()">Exportar CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>CUIT / DNI</th>
+                <th>Teléfono</th>
+                <th>Email</th>
+                <th>Localidad</th>
+                <th>Total salidas</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-clientes"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── Campos ── -->
+      <div class="sub-section" id="subtab-campos">
+        <h2 style="margin-bottom:1rem">🗺️ Nuevo campo</h2>
+        <form id="form-campo">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="ca-nombre">Nombre del campo *</label>
+              <input id="ca-nombre" type="text" placeholder="Ej: Campo Norte, Lote 3" required />
+            </div>
+            <div class="form-group">
+              <label for="ca-tipo">Tipo</label>
+              <select id="ca-tipo">
+                <option value="Propio">Propio</option>
+                <option value="Alquilado">Alquilado</option>
+                <option value="En consignación">En consignación</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="ca-hectareas">Hectáreas</label>
+              <input id="ca-hectareas" type="number" min="0" step="any" placeholder="0" />
+            </div>
+            <div class="form-group">
+              <label for="ca-ubicacion">Ubicación / Localidad</label>
+              <input id="ca-ubicacion" type="text" placeholder="Ej: Ceres, Santa Fe" />
+            </div>
+            <div class="form-group">
+              <label for="ca-propietario">Propietario (si es alquilado)</label>
+              <input id="ca-propietario" type="text" placeholder="Nombre del dueño" />
+            </div>
+            <div class="form-group">
+              <label for="ca-vencimiento">Vencimiento contrato</label>
+              <input id="ca-vencimiento" type="date" />
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label for="ca-notas">Notas</label>
+              <textarea id="ca-notas" placeholder="Observaciones del campo…"></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="resetCampo()">Limpiar</button>
+            <button type="submit" class="btn btn-primary">Guardar campo</button>
+          </div>
+        </form>
+
+        <hr style="margin:1.5rem 0;border:none;border-top:1px solid var(--border)" />
+
+        <h2 style="margin-bottom:1rem">📋 Campos registrados</h2>
+        <div class="toolbar">
+          <input id="ca-search" type="search" placeholder="Buscar campo…" oninput="renderCampos()" />
+          <select id="ca-filter-tipo" onchange="renderCampos()" style="width:auto;min-width:160px;">
+            <option value="">Todos los tipos</option>
+            <option value="Propio">Propio</option>
+            <option value="Alquilado">Alquilado</option>
+            <option value="En consignación">En consignación</option>
+          </select>
+          <button class="btn btn-blue btn-sm" onclick="exportCamposCSV()">Exportar CSV</button>
+        </div>
+        <div id="campos-grid" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))"></div>
+      </div>
+
+      <!-- ── Proveedores ── -->
+      <div class="sub-section" id="subtab-proveedores">
+        <h2 style="margin-bottom:1rem">🚚 Nuevo proveedor</h2>
+        <form id="form-proveedor">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="pv-nombre">Nombre / Razón social *</label>
+              <input id="pv-nombre" type="text" placeholder="Nombre del proveedor" required />
+            </div>
+            <div class="form-group">
+              <label for="pv-cuit">CUIT / DNI</label>
+              <input id="pv-cuit" type="text" placeholder="Ej: 20-12345678-9" />
+            </div>
+            <div class="form-group">
+              <label for="pv-tel">Teléfono</label>
+              <input id="pv-tel" type="text" placeholder="Ej: +54 9 11 1234-5678" />
+            </div>
+            <div class="form-group">
+              <label for="pv-email">Email</label>
+              <input id="pv-email" type="email" placeholder="correo@ejemplo.com" />
+            </div>
+            <div class="form-group">
+              <label for="pv-localidad">Localidad</label>
+              <input id="pv-localidad" type="text" placeholder="Ciudad / Localidad" />
+            </div>
+            <div class="form-group">
+              <label for="pv-rubro">Rubro / Producto que provee</label>
+              <input id="pv-rubro" type="text" placeholder="Ej: Insumos, Hacienda, Granos…" />
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label for="pv-notas">Notas</label>
+              <textarea id="pv-notas" placeholder="Observaciones sobre el proveedor…"></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" onclick="resetProveedor()">Limpiar</button>
+            <button type="submit" class="btn btn-primary">Guardar proveedor</button>
+          </div>
+        </form>
+
+        <hr style="margin:1.5rem 0;border:none;border-top:1px solid var(--border)" />
+
+        <h2 style="margin-bottom:1rem">📋 Listado de proveedores</h2>
+        <div class="toolbar">
+          <input id="pv-search" type="search" placeholder="Buscar proveedor…" oninput="renderProveedores()" />
+          <button class="btn btn-blue btn-sm" onclick="exportProveedoresCSV()">Exportar CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>CUIT / DNI</th>
+                <th>Teléfono</th>
+                <th>Email</th>
+                <th>Localidad</th>
+                <th>Rubro</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-proveedores"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /card -->
   </div>
 </div>
 
@@ -795,72 +917,6 @@
         </select>
       </div>
       <div id="notas-grid" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))"></div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ═══════════════════════════════ CAMPOS ═══════════════════════════════ -->
-<div class="page" id="page-campos">
-  <div class="container">
-
-    <div class="card">
-      <h2>🗺️ Nuevo campo</h2>
-      <form id="form-campo">
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="ca-nombre">Nombre del campo *</label>
-            <input id="ca-nombre" type="text" placeholder="Ej: Campo Norte, Lote 3" required />
-          </div>
-          <div class="form-group">
-            <label for="ca-tipo">Tipo</label>
-            <select id="ca-tipo">
-              <option value="Propio">Propio</option>
-              <option value="Alquilado">Alquilado</option>
-              <option value="En consignación">En consignación</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="ca-hectareas">Hectáreas</label>
-            <input id="ca-hectareas" type="number" min="0" step="any" placeholder="0" />
-          </div>
-          <div class="form-group">
-            <label for="ca-ubicacion">Ubicación / Localidad</label>
-            <input id="ca-ubicacion" type="text" placeholder="Ej: Ceres, Santa Fe" />
-          </div>
-          <div class="form-group">
-            <label for="ca-propietario">Propietario (si es alquilado)</label>
-            <input id="ca-propietario" type="text" placeholder="Nombre del dueño" />
-          </div>
-          <div class="form-group">
-            <label for="ca-vencimiento">Vencimiento contrato</label>
-            <input id="ca-vencimiento" type="date" />
-          </div>
-          <div class="form-group" style="grid-column: 1 / -1;">
-            <label for="ca-notas">Notas</label>
-            <textarea id="ca-notas" placeholder="Observaciones del campo…"></textarea>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" onclick="resetCampo()">Limpiar</button>
-          <button type="submit" class="btn btn-primary">Guardar campo</button>
-        </div>
-      </form>
-    </div>
-
-    <div class="card">
-      <h2>📋 Campos registrados</h2>
-      <div class="toolbar">
-        <input id="ca-search" type="search" placeholder="Buscar campo…" oninput="renderCampos()" />
-        <select id="ca-filter-tipo" onchange="renderCampos()" style="width:auto;min-width:160px;">
-          <option value="">Todos los tipos</option>
-          <option value="Propio">Propio</option>
-          <option value="Alquilado">Alquilado</option>
-          <option value="En consignación">En consignación</option>
-        </select>
-        <button class="btn btn-blue btn-sm" onclick="exportCamposCSV()">Exportar CSV</button>
-      </div>
-      <div id="campos-grid" style="display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))"></div>
     </div>
 
   </div>
@@ -1073,6 +1129,49 @@
   </div>
 </div>
 
+<!-- ── Modal editar proveedor ── -->
+<div class="modal-backdrop" id="modal-proveedor">
+  <div class="modal">
+    <h3>✏️ Editar proveedor</h3>
+    <form id="form-edit-proveedor">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nombre / Razón social *</label>
+          <input id="epv-nombre" type="text" required />
+        </div>
+        <div class="form-group">
+          <label>CUIT / DNI</label>
+          <input id="epv-cuit" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input id="epv-tel" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input id="epv-email" type="email" />
+        </div>
+        <div class="form-group">
+          <label>Localidad</label>
+          <input id="epv-localidad" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Rubro / Producto que provee</label>
+          <input id="epv-rubro" type="text" />
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Notas</label>
+          <textarea id="epv-notas"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-proveedor')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- Firebase SDK -->
@@ -1100,14 +1199,15 @@ const db = firebase.firestore();
 //  ESTADO LOCAL (sincronizado por Firestore)
 // ═══════════════════════════════════════════
 
-let salidas  = [];
-let ingresos = [];
-let clientes = [];
-let notas    = [];
-let campos   = [];
+let salidas     = [];
+let ingresos    = [];
+let clientes    = [];
+let notas       = [];
+let campos      = [];
+let proveedores = [];
 
 // Contadores para saber cuándo todos los listeners cargaron por primera vez
-let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false };
+let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false };
 
 function checkLoaded() {
   return Object.values(_loaded).every(Boolean);
@@ -1144,13 +1244,20 @@ db.collection('campos').orderBy('nombre','asc').onSnapshot(snap => {
   if (checkLoaded()) renderAll();
 });
 
+db.collection('proveedores').orderBy('nombre','asc').onSnapshot(snap => {
+  proveedores = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.proveedores = true;
+  if (checkLoaded()) renderAll();
+});
+
 // ── helpers Firestore ──
 const COL = {
-  salidas:  () => db.collection('salidas'),
-  ingresos: () => db.collection('ingresos'),
-  clientes: () => db.collection('clientes'),
-  notas:    () => db.collection('notas'),
-  campos:   () => db.collection('campos'),
+  salidas:     () => db.collection('salidas'),
+  ingresos:    () => db.collection('ingresos'),
+  clientes:    () => db.collection('clientes'),
+  notas:       () => db.collection('notas'),
+  campos:      () => db.collection('campos'),
+  proveedores: () => db.collection('proveedores'),
 };
 
 const PRODUCTOS = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría','Otro'];
@@ -1221,6 +1328,13 @@ function showPage(page, el) {
   renderAll();
 }
 
+function showTabla(section, el) {
+  document.querySelectorAll('#page-tablas .sub-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('subtab-' + section).classList.add('active');
+  if (el) el.classList.add('active');
+}
+
 // ═══════════════════════════════════════════
 //  STOCK CALCULADO
 // ═══════════════════════════════════════════
@@ -1248,10 +1362,8 @@ function calcStock() {
 
 function renderDashboard() {
   const stock = calcStock();
-  const today    = todayISO();
-  const thisMonth = today.slice(0,7);
 
-  // Alertas stock bajo
+  // Alertas stock negativo
   const alertContainer = document.getElementById('alert-container');
   const bajos = Object.entries(stock).filter(([,v]) => v < 0);
   if (bajos.length) {
@@ -1260,62 +1372,8 @@ function renderDashboard() {
     alertContainer.innerHTML = '';
   }
 
-  // Stats
-  const hoy = salidas.filter(s => s.fecha === today).length;
-  const mes  = salidas.filter(s => s.fecha?.startsWith(thisMonth)).length;
-  const pendientes = salidas.filter(s => s.estado === 'Pendiente').length;
-  const nClientes = new Set(salidas.map(s => s.cliente?.toLowerCase())).size;
-
-  document.getElementById('dash-stats').innerHTML = `
-    <div class="stat-card sc-green">
-      <span class="s-label">Total salidas</span>
-      <span class="s-val">${salidas.length}</span>
-      <span class="s-sub">registros históricos</span>
-    </div>
-    <div class="stat-card sc-blue">
-      <span class="s-label">Salidas hoy</span>
-      <span class="s-val">${hoy}</span>
-      <span class="s-sub">${fmtDate(today)}</span>
-    </div>
-    <div class="stat-card sc-green">
-      <span class="s-label">Este mes</span>
-      <span class="s-val">${mes}</span>
-      <span class="s-sub">salidas registradas</span>
-    </div>
-    <div class="stat-card sc-amber">
-      <span class="s-label">Pendientes</span>
-      <span class="s-val">${pendientes}</span>
-      <span class="s-sub">sin confirmar entrega</span>
-    </div>
-    <div class="stat-card sc-blue">
-      <span class="s-label">Clientes activos</span>
-      <span class="s-val">${nClientes}</span>
-      <span class="s-sub">con salidas registradas</span>
-    </div>
-  `;
-
-  // Stock cards con precio neto (pizarra − flete) — renderizado por renderDashStockCards()
+  // Stock cards con precio neto (pizarra − flete)
   renderDashStockCards();
-
-  // Últimas 8 salidas
-  const ultimas = [...salidas].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,8);
-  const tbody = document.getElementById('dash-table');
-  if (ultimas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-msg">No hay salidas registradas aún.</td></tr>`;
-  } else {
-    tbody.innerHTML = ultimas.map(s => `
-      <tr>
-        <td>${fmtDate(s.fecha)}</td>
-        <td><strong>${esc(s.cliente)}</strong></td>
-        <td>${ICONOS[s.producto]||''} ${esc(s.producto)}</td>
-        <td>${fmtNum(s.cantidad)} ${esc(s.unidad||'')}</td>
-        <td>${s.campo ? `<span class="badge b-green">📍 ${esc(s.campo)}</span>` : '—'}</td>
-        <td><code>${esc(s.patente||'—')}</code></td>
-        <td><code>${esc(s.remito||'—')}</code></td>
-        <td><span class="badge ${badgeSalida(s.estado)}">${esc(s.estado)}</span></td>
-      </tr>
-    `).join('');
-  }
 }
 
 function badgeSalida(e) {
@@ -1869,6 +1927,7 @@ function renderAll() {
   renderMovimientos();
   renderClientes();
   renderCampos();
+  renderProveedores();
   renderNotas();
   actualizarValorizacion();
 }
@@ -2015,6 +2074,112 @@ function exportCamposCSV() {
   const data = campos.map(c => [c.nombre,c.tipo,c.hectareas,c.ubicacion,c.propietario,c.vencimiento,c.notas]
     .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
   downloadCSV([cols.join(','), ...data].join('\r\n'), `campos_blenda_${todayISO()}.csv`);
+  toast('📄 CSV exportado');
+}
+
+// ═══════════════════════════════════════════
+//  PROVEEDORES
+// ═══════════════════════════════════════════
+
+let editProveedorId = null;
+
+document.getElementById('form-proveedor').addEventListener('submit', e => {
+  e.preventDefault();
+  const rec = {
+    nombre:    document.getElementById('pv-nombre').value.trim(),
+    cuit:      document.getElementById('pv-cuit').value.trim(),
+    tel:       document.getElementById('pv-tel').value.trim(),
+    email:     document.getElementById('pv-email').value.trim(),
+    localidad: document.getElementById('pv-localidad').value.trim(),
+    rubro:     document.getElementById('pv-rubro').value.trim(),
+    notas:     document.getElementById('pv-notas').value.trim(),
+  };
+  COL.proveedores().add(rec).then(() => {
+    resetProveedor();
+    toast('✅ Proveedor guardado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+});
+
+function resetProveedor() { document.getElementById('form-proveedor').reset(); }
+
+function renderProveedores() {
+  // Actualizar datalist de proveedores en ingresos
+  const dlPv = document.getElementById('lista-proveedores');
+  if (dlPv) dlPv.innerHTML = proveedores.map(p => `<option value="${esc(p.nombre)}">`).join('');
+
+  const q = (document.getElementById('pv-search')?.value || '').toLowerCase();
+  const rows = proveedores.filter(p =>
+    !q || [p.nombre, p.cuit, p.localidad, p.rubro].some(v => String(v||'').toLowerCase().includes(q))
+  );
+
+  const tbody = document.getElementById('tabla-proveedores');
+  if (!tbody) return;
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">No hay proveedores registrados aún.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(p => `
+    <tr>
+      <td><strong>${esc(p.nombre)}</strong></td>
+      <td>${esc(p.cuit||'—')}</td>
+      <td>${esc(p.tel||'—')}</td>
+      <td>${esc(p.email||'—')}</td>
+      <td>${esc(p.localidad||'—')}</td>
+      <td>${esc(p.rubro||'—')}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openEditProveedor('${p.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteProveedor('${p.id}'))">Eliminar</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openEditProveedor(id) {
+  const p = proveedores.find(x => x.id === id);
+  if (!p) return;
+  editProveedorId = id;
+  document.getElementById('epv-nombre').value    = p.nombre;
+  document.getElementById('epv-cuit').value      = p.cuit || '';
+  document.getElementById('epv-tel').value       = p.tel || '';
+  document.getElementById('epv-email').value     = p.email || '';
+  document.getElementById('epv-localidad').value = p.localidad || '';
+  document.getElementById('epv-rubro').value     = p.rubro || '';
+  document.getElementById('epv-notas').value     = p.notas || '';
+  document.getElementById('modal-proveedor').classList.add('open');
+}
+
+document.getElementById('form-edit-proveedor').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!editProveedorId) return;
+  const data = {
+    nombre:    document.getElementById('epv-nombre').value.trim(),
+    cuit:      document.getElementById('epv-cuit').value.trim(),
+    tel:       document.getElementById('epv-tel').value.trim(),
+    email:     document.getElementById('epv-email').value.trim(),
+    localidad: document.getElementById('epv-localidad').value.trim(),
+    rubro:     document.getElementById('epv-rubro').value.trim(),
+    notas:     document.getElementById('epv-notas').value.trim(),
+  };
+  COL.proveedores().doc(editProveedorId).update(data).then(() => {
+    closeModal('modal-proveedor');
+    toast('✅ Proveedor actualizado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+});
+
+function deleteProveedor(id) {
+  COL.proveedores().doc(id).delete()
+    .then(() => toast('🗑️ Proveedor eliminado'))
+    .catch(() => toast('❌ Error al eliminar.'));
+}
+
+function exportProveedoresCSV() {
+  if (!proveedores.length) { toast('No hay proveedores'); return; }
+  const cols = ['Nombre','CUIT','Teléfono','Email','Localidad','Rubro','Notas'];
+  const data = proveedores.map(p => [p.nombre,p.cuit,p.tel,p.email,p.localidad,p.rubro,p.notas]
+    .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
+  downloadCSV([cols.join(','), ...data].join('\r\n'), `proveedores_blenda_${todayISO()}.csv`);
   toast('📄 CSV exportado');
 }
 
