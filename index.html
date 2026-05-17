@@ -1295,25 +1295,41 @@ function renderDashboard() {
   salidas.forEach(s  => { totSalido[s.producto]   = (totSalido[s.producto]||0)   + (parseFloat(s.cantidad)||0); });
 
   const aviso = sinStock
-    ? `<div class="alert-banner" style="margin-bottom:1rem;grid-column:1/-1">📥 Para ver el stock restante, primero cargá el stock en la pestaña <strong>📦 Stock → Cargar ingreso</strong>.</div>`
+    ? `<div class="alert-banner" style="margin-bottom:1rem;grid-column:1/-1">📥 Para ver el stock, primero cargá la cosecha en <strong>📦 Stock → Cargar ingreso</strong>.</div>`
     : '';
 
   const productosConMov = PRODUCTOS.filter(p => totIngresado[p] > 0 || totSalido[p] > 0);
-  const items = (productosConMov.length > 0 ? productosConMov : PRODUCTOS).map(p => {
-    const restante = stock[p] ?? 0;
-    const negativo = restante < 0;
-    const color    = negativo ? 'var(--red)' : (totIngresado[p] === 0 ? '#9ca3af' : 'var(--gray-dark)');
+  const listaProductos  = productosConMov.length > 0 ? productosConMov : PRODUCTOS;
+
+  const items = listaProductos.map(p => {
+    const cantidad  = stock[p] ?? 0;
+    const precio    = preciosCot[p]?.ars || null;
+    const valorizado = precio ? cantidad * precio : null;
+    const negativo  = cantidad < 0;
+
     return `
     <div class="stock-item">
       <span class="si-icon">${ICONOS[p]}</span>
       <span class="si-name">${p}</span>
-      <span class="si-qty" style="color:${color}">${fmtNum(restante)}</span>
-      <span class="si-unit">${UNIDADES[p] || 'unidades'} disponibles</span>
-      <div style="margin-top:.5rem;font-size:.75rem;display:flex;gap:.5rem;flex-wrap:wrap">
-        <span style="color:var(--green-dark)">▲ ${fmtNum(totIngresado[p])} ingresado</span>
-        <span style="color:var(--red)">▼ ${fmtNum(totSalido[p])} entregado</span>
+      <div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.3rem">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--gray)">Cantidad</span>
+          <span style="font-weight:800;font-size:1rem;color:${negativo?'var(--red)':'var(--gray-dark)'}">
+            ${fmtNum(cantidad)} <small style="font-weight:400;font-size:.7rem">${UNIDADES[p]||''}</small>
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--gray)">Precio pizarra</span>
+          <span style="font-weight:600;font-size:.88rem;color:#374151">${precio ? '$'+fmtNum(Math.round(precio))+'/tn' : '—'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:.3rem;margin-top:.1rem">
+          <span style="font-size:.72rem;font-weight:700;color:var(--gray)">Valorizado</span>
+          <span style="font-weight:800;font-size:.95rem;color:${valorizado ? 'var(--green-dark)' : '#9ca3af'}">
+            ${valorizado ? '$'+fmtNum(Math.round(valorizado)) : '—'}
+          </span>
+        </div>
       </div>
-      ${negativo ? '<span class="si-alert">⚠️ Más entregado que ingresado</span>' : ''}
+      ${negativo ? '<span class="si-alert">⚠️ Stock negativo</span>' : ''}
     </div>`;
   }).join('');
 
