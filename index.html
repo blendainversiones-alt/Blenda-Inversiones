@@ -2246,8 +2246,9 @@ function renderFletesGrid() {
   const grid = document.getElementById('fletes-grid');
   if (!grid) return;
   const fletes = getFletes();
-  const productosGranos = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría'];
-  grid.innerHTML = productosGranos.map(p => `
+  // Flete solo aplica a granos (precio en $/tn)
+  const granos = ['Maíz','Soja','Trigo'];
+  grid.innerHTML = granos.map(p => `
     <div style="display:flex;flex-direction:column;gap:.2rem">
       <label style="font-size:.72rem;font-weight:600;color:#4b5563">${ICONOS[p]||''} ${p}</label>
       <div style="display:flex;align-items:center;gap:.3rem">
@@ -2381,13 +2382,17 @@ async function cargarCotizaciones() {
   }
 }
 
+const GRANOS = ['Maíz','Soja','Trigo'];
+const HACIENDA = ['Hacienda Engorde','Hacienda Recría'];
+
 function actualizarValorizacion() {
   const stock  = calcStock();
   const fletes = getFletes();
   let totalARS = 0;
   const detalles = [];
 
-  PRODUCTOS.forEach(p => {
+  // Granos: valorización por (pizarra − flete) × toneladas
+  GRANOS.forEach(p => {
     const cant = stock[p] || 0;
     if (cant <= 0 || !preciosCot[p]) return;
     const pizarra  = preciosCot[p].ars;
@@ -2399,6 +2404,17 @@ function actualizarValorizacion() {
       `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} tn × $${fmtNum(Math.round(neto))}/tn` +
       (flete > 0 ? ` <span style="color:var(--gray)">(pizarra $${fmtNum(Math.round(pizarra))} − flete $${fmtNum(flete)})</span>` : '') +
       ` = <strong>$${fmtNum(Math.round(valorARS))}</strong>`
+    );
+  });
+
+  // Hacienda: solo referencia $/kg, no suma al total de granos
+  HACIENDA.forEach(p => {
+    const cant = stock[p] || 0;
+    if (cant <= 0 || !preciosCot[p]) return;
+    const precio = preciosCot[p].ars;
+    const fuente = preciosCot[p].fuente || 'Liniers';
+    detalles.push(
+      `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cabezas · ref. $${fmtNum(Math.round(precio))}/kg (${fuente}) — <span style="color:var(--gray)">sin valorización automática</span>`
     );
   });
 
@@ -2431,12 +2447,22 @@ function renderDashStockCards() {
     : '';
 
   el.innerHTML = aviso + lista.map(p => {
-    const cantidad   = stock[p] ?? 0;
-    const pizarra    = preciosCot[p]?.ars || null;
-    const flete      = fletes[p] || 0;
-    const neto       = pizarra ? Math.max(pizarra - flete, 0) : null;
+    const cantidad  = stock[p] ?? 0;
+    const negativo  = cantidad < 0;
+    const esHacienda = HACIENDA.includes(p);
+    const precio    = preciosCot[p]?.ars || null;
+    const fuente    = preciosCot[p]?.fuente || '';
+
+    // Granos: precio neto = pizarra − flete, se valoriza en $/tn
+    const flete     = !esHacienda ? (fletes[p] || 0) : 0;
+    const neto      = !esHacienda && precio ? Math.max(precio - flete, 0) : null;
     const valorizado = neto ? cantidad * neto : null;
-    const negativo   = cantidad < 0;
+
+    const precioLabel = esHacienda
+      ? (precio ? `$${fmtNum(Math.round(precio))}/kg` + (fuente ? ` · ${fuente}` : '') : '—')
+      : (neto   ? `$${fmtNum(Math.round(neto))}/tn` + (flete > 0 ? ` <small style="color:var(--gray);font-size:.65rem">(−$${fmtNum(flete)} flete)</small>` : '') : '—');
+
+    const precioRowLabel = esHacienda ? 'Ref. precio' : 'Precio neto';
 
     return `
     <div class="stock-item">
@@ -2450,16 +2476,13 @@ function renderDashStockCards() {
           </span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.72rem;color:var(--gray)">Precio neto</span>
-          <span style="font-weight:600;font-size:.88rem;color:#374151">
-            ${neto ? '$'+fmtNum(Math.round(neto))+'/tn' : '—'}
-            ${pizarra && flete > 0 ? `<small style="color:var(--gray);font-size:.65rem"> (−$${fmtNum(flete)} flete)</small>` : ''}
-          </span>
+          <span style="font-size:.72rem;color:var(--gray)">${precioRowLabel}</span>
+          <span style="font-weight:600;font-size:.88rem;color:#374151">${precioLabel}</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:.3rem;margin-top:.1rem">
           <span style="font-size:.72rem;font-weight:700;color:var(--gray)">Valorizado</span>
           <span style="font-weight:800;font-size:.95rem;color:${valorizado ? 'var(--green-dark)' : '#9ca3af'}">
-            ${valorizado ? '$'+fmtNum(Math.round(valorizado)) : '—'}
+            ${valorizado ? '$'+fmtNum(Math.round(valorizado)) : esHacienda ? '<span style="font-size:.7rem;color:#9ca3af">ver precio/kg</span>' : '—'}
           </span>
         </div>
       </div>
@@ -2468,9 +2491,84 @@ function renderDashStockCards() {
   }).join('');
 }
 
+// ── Precios de hacienda desde deCampoaCampo (Liniers) ──
+async function cargarPreciosHacienda() {
+  try {
+    const BASE = 'https://www.decampoacampo.com/gh_funciones.php';
+    const PROXY = url => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`;
+
+    // Intentar fetch directo primero (CORS), si falla usa proxy
+    async function fetchJSON(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(r.status);
+        return await r.json();
+      } catch(e) {
+        const r2 = await fetch(PROXY(url));
+        if (!r2.ok) throw new Error('Proxy falló');
+        return await r2.json();
+      }
+    }
+
+    const [gordo, invernada] = await Promise.all([
+      fetchJSON(`${BASE}?function=getListadoPreciosGordo`),
+      fetchJSON(`${BASE}?function=getListadoPreciosInvernada&p=1&m=pesos`),
+    ]);
+
+    // Hacienda Engorde → promedio de novillitos + novillos (precio semana más reciente)
+    const catEngorde = (gordo.data || []).filter(c =>
+      /novillit|novillo/i.test(c.categoria)
+    );
+    const precioEngorde = catEngorde.length
+      ? catEngorde.reduce((s, c) => s + (parseFloat(c.precio_semana_1) || 0), 0) / catEngorde.length
+      : null;
+
+    // Hacienda Recría → promedio de terneros (invernada machos)
+    const catRecriar = (invernada.categorias || []).filter(c =>
+      /ternero/i.test(c.nombre)
+    );
+    const precioRecriar = catRecriar.length
+      ? catRecriar.reduce((s, c) => s + (parseFloat(c.precio_semana_actual) || 0), 0) / catRecriar.length
+      : null;
+
+    if (precioEngorde) preciosCot['Hacienda Engorde'] = { ars: precioEngorde, label: 'Hacienda Engorde', fuente: 'Liniers gordo' };
+    if (precioRecriar) preciosCot['Hacienda Recría']  = { ars: precioRecriar, label: 'Hacienda Recría',  fuente: 'Invernada' };
+
+    // Agregar cards de hacienda al grid de cotizaciones
+    const grid = document.getElementById('cotizaciones-grid');
+    if (grid && (precioEngorde || precioRecriar)) {
+      const hacCards = [
+        precioEngorde ? { label:'🐄 H. Engorde', valor:`$${fmtNum(Math.round(precioEngorde))}/kg`, sub:`Novillito/Novillo · Liniers` } : null,
+        precioRecriar ? { label:'🐂 H. Recría',  valor:`$${fmtNum(Math.round(precioRecriar))}/kg`,  sub:`Ternero invernada` } : null,
+      ].filter(Boolean);
+
+      const existente = grid.innerHTML;
+      // Insertar antes del div de fuentes (último elemento)
+      const lastDiv = grid.lastElementChild;
+      hacCards.forEach(it => {
+        const div = document.createElement('div');
+        div.style.cssText = 'background:var(--amber-light);border-radius:8px;padding:.75rem 1rem;text-align:center';
+        div.innerHTML = `
+          <div style="font-size:.72rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
+          <div style="font-size:1.15rem;font-weight:800;color:#92400e">${it.valor}</div>
+          <div style="font-size:.68rem;color:#b45309">${it.sub}</div>`;
+        grid.insertBefore(div, lastDiv);
+      });
+    }
+
+    actualizarValorizacion();
+  } catch(e) {
+    console.warn('No se pudieron cargar precios de hacienda:', e.message);
+  }
+}
+
 // Cargar cotizaciones al arrancar y cada 15 minutos
-cargarCotizaciones();
-setInterval(cargarCotizaciones, 15 * 60 * 1000);
+async function iniciarCotizaciones() {
+  await cargarCotizaciones();
+  await cargarPreciosHacienda();
+}
+iniciarCotizaciones();
+setInterval(iniciarCotizaciones, 15 * 60 * 1000);
 
 // ── Boot: los listeners de Firestore arrancan solos y llaman renderAll() cuando cargan ──
 </script>
