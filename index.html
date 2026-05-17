@@ -2493,73 +2493,76 @@ function renderDashStockCards() {
 
 // ── Precios de hacienda desde deCampoaCampo (Liniers) ──
 async function cargarPreciosHacienda() {
+  // URLs del proxy con parámetros pre-encodados para evitar conflictos
+  const URL_GORDO     = 'https://api.codetabs.com/v1/proxy/?quest=https%3A%2F%2Fwww.decampoacampo.com%2Fgh_funciones.php%3Ffunction%3DgetListadoPreciosGordo';
+  const URL_INVERNADA = 'https://api.codetabs.com/v1/proxy/?quest=https%3A%2F%2Fwww.decampoacampo.com%2Fgh_funciones.php%3Ffunction%3DgetListadoPreciosInvernada%26p%3D1%26m%3Dpesos';
+
+  let gordo = null, invernada = null;
+
+  // Intento 1: fetch directo (funciona si el servidor permite CORS)
   try {
-    const BASE = 'https://www.decampoacampo.com/gh_funciones.php';
-    const PROXY = url => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`;
-
-    // Intentar fetch directo primero (CORS), si falla usa proxy
-    async function fetchJSON(url) {
-      try {
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(r.status);
-        return await r.json();
-      } catch(e) {
-        const r2 = await fetch(PROXY(url));
-        if (!r2.ok) throw new Error('Proxy falló');
-        return await r2.json();
-      }
-    }
-
-    const [gordo, invernada] = await Promise.all([
-      fetchJSON(`${BASE}?function=getListadoPreciosGordo`),
-      fetchJSON(`${BASE}?function=getListadoPreciosInvernada&p=1&m=pesos`),
+    const [rG, rI] = await Promise.all([
+      fetch('https://www.decampoacampo.com/gh_funciones.php?function=getListadoPreciosGordo'),
+      fetch('https://www.decampoacampo.com/gh_funciones.php?function=getListadoPreciosInvernada&p=1&m=pesos'),
     ]);
-
-    // Hacienda Engorde → promedio de novillitos + novillos (precio semana más reciente)
-    const catEngorde = (gordo.data || []).filter(c =>
-      /novillit|novillo/i.test(c.categoria)
-    );
-    const precioEngorde = catEngorde.length
-      ? catEngorde.reduce((s, c) => s + (parseFloat(c.precio_semana_1) || 0), 0) / catEngorde.length
-      : null;
-
-    // Hacienda Recría → promedio de terneros (invernada machos)
-    const catRecriar = (invernada.categorias || []).filter(c =>
-      /ternero/i.test(c.nombre)
-    );
-    const precioRecriar = catRecriar.length
-      ? catRecriar.reduce((s, c) => s + (parseFloat(c.precio_semana_actual) || 0), 0) / catRecriar.length
-      : null;
-
-    if (precioEngorde) preciosCot['Hacienda Engorde'] = { ars: precioEngorde, label: 'Hacienda Engorde', fuente: 'Liniers gordo' };
-    if (precioRecriar) preciosCot['Hacienda Recría']  = { ars: precioRecriar, label: 'Hacienda Recría',  fuente: 'Invernada' };
-
-    // Agregar cards de hacienda al grid de cotizaciones
-    const grid = document.getElementById('cotizaciones-grid');
-    if (grid && (precioEngorde || precioRecriar)) {
-      const hacCards = [
-        precioEngorde ? { label:'🐄 H. Engorde', valor:`$${fmtNum(Math.round(precioEngorde))}/kg`, sub:`Novillito/Novillo · Liniers` } : null,
-        precioRecriar ? { label:'🐂 H. Recría',  valor:`$${fmtNum(Math.round(precioRecriar))}/kg`,  sub:`Ternero invernada` } : null,
-      ].filter(Boolean);
-
-      const existente = grid.innerHTML;
-      // Insertar antes del div de fuentes (último elemento)
-      const lastDiv = grid.lastElementChild;
-      hacCards.forEach(it => {
-        const div = document.createElement('div');
-        div.style.cssText = 'background:var(--amber-light);border-radius:8px;padding:.75rem 1rem;text-align:center';
-        div.innerHTML = `
-          <div style="font-size:.72rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
-          <div style="font-size:1.15rem;font-weight:800;color:#92400e">${it.valor}</div>
-          <div style="font-size:.68rem;color:#b45309">${it.sub}</div>`;
-        grid.insertBefore(div, lastDiv);
-      });
+    if (rG.ok && rI.ok) {
+      gordo     = await rG.json();
+      invernada = await rI.json();
     }
+  } catch(e) { /* CORS bloqueado, usar proxy */ }
 
-    actualizarValorizacion();
-  } catch(e) {
-    console.warn('No se pudieron cargar precios de hacienda:', e.message);
+  // Intento 2: proxy codetabs con URLs pre-encodadas
+  if (!gordo || !invernada) {
+    try {
+      const [rG, rI] = await Promise.all([
+        fetch(URL_GORDO),
+        fetch(URL_INVERNADA),
+      ]);
+      if (rG.ok) gordo     = await rG.json();
+      if (rI.ok) invernada = await rI.json();
+    } catch(e) { console.warn('Hacienda proxy falló:', e.message); }
   }
+
+  if (!gordo && !invernada) return; // sin datos, salir silenciosamente
+
+  // Hacienda Engorde → promedio novillitos + novillos (precio semana 1 = más reciente)
+  const catEngorde = (gordo?.data || []).filter(c => /novillit|novillo/i.test(c.categoria));
+  const precioEngorde = catEngorde.length
+    ? catEngorde.reduce((s, c) => s + (parseFloat(c.precio_semana_1) || 0), 0) / catEngorde.length
+    : null;
+
+  // Hacienda Recría → promedio terneros invernada machos
+  const catRecriar = (invernada?.categorias || []).filter(c => /ternero/i.test(c.nombre));
+  const precioRecriar = catRecriar.length
+    ? catRecriar.reduce((s, c) => s + (parseFloat(c.precio_semana_actual) || 0), 0) / catRecriar.length
+    : null;
+
+  if (precioEngorde) preciosCot['Hacienda Engorde'] = { ars: precioEngorde, label: 'Hacienda Engorde', fuente: 'Liniers' };
+  if (precioRecriar) preciosCot['Hacienda Recría']  = { ars: precioRecriar, label: 'Hacienda Recría',  fuente: 'Invernada' };
+
+  // Render cards de hacienda dentro del grid de cotizaciones
+  const grid = document.getElementById('cotizaciones-grid');
+  if (!grid) return;
+
+  // Quitar cards de hacienda anteriores (si ya existían por recarga)
+  grid.querySelectorAll('.hac-card').forEach(el => el.remove());
+
+  const lastDiv = grid.lastElementChild;
+  [
+    precioEngorde ? { label:'🐄 Hacienda Engorde', valor:`$${fmtNum(Math.round(precioEngorde))}/kg`, sub:'Novillito/Novillo · Liniers' } : null,
+    precioRecriar ? { label:'🐂 Hacienda Recría',  valor:`$${fmtNum(Math.round(precioRecriar))}/kg`,  sub:'Ternero invernada'           } : null,
+  ].filter(Boolean).forEach(it => {
+    const div = document.createElement('div');
+    div.className = 'hac-card';
+    div.style.cssText = 'background:var(--amber-light);border-radius:8px;padding:.75rem 1rem;text-align:center';
+    div.innerHTML = `
+      <div style="font-size:.72rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
+      <div style="font-size:1.15rem;font-weight:800;color:#92400e">${it.valor}</div>
+      <div style="font-size:.68rem;color:#b45309">${it.sub}</div>`;
+    grid.insertBefore(div, lastDiv);
+  });
+
+  actualizarValorizacion();
 }
 
 // Cargar cotizaciones al arrancar y cada 15 minutos
