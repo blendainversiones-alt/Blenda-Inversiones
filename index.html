@@ -1451,6 +1451,27 @@ function badgeSalida(e) {
 }
 
 // ═══════════════════════════════════════════
+//  VALIDACIÓN DE REFERENCIAS (Cliente/Campo/Proveedor)
+// ═══════════════════════════════════════════
+// Si el valor no existe en la tabla, pregunta si agregarlo y seguir cargando.
+// Devuelve true para continuar, false para abortar el guardado.
+async function validarYAgregarRef(valor, lista, tipoLabel, addCallback) {
+  if (!valor) return true;
+  const exists = lista.find(x => (x.nombre || '').toLowerCase() === valor.toLowerCase());
+  if (exists) return true;
+  const ok = confirm(`⚠️ "${valor}" no está cargado en ${tipoLabel}.\n\n¿Querés agregarlo a la tabla y seguir guardando?`);
+  if (!ok) return false;
+  try {
+    await addCallback();
+    toast(`✅ ${tipoLabel.slice(0,-1)} "${valor}" agregado a la tabla`, '#14532d');
+    return true;
+  } catch(e) {
+    toast(`❌ No se pudo agregar "${valor}"`);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════
 //  SALIDAS
 // ═══════════════════════════════════════════
 
@@ -1469,18 +1490,42 @@ function updateUnidadIngreso() {
   document.getElementById('i-unidad').value = UNIDADES[p] || '';
   const esHac = HACIENDA.includes(p);
   document.getElementById('grp-peso-prom').style.display = esHac ? '' : 'none';
-  if (!esHac) document.getElementById('i-peso-prom').value = '';
+  const inp = document.getElementById('i-peso-prom');
+  const lbl = document.querySelector('#grp-peso-prom label');
+  if (esHac) {
+    inp.setAttribute('required', '');
+    if (lbl) lbl.textContent = 'Peso promedio (kg/cabeza) *';
+  } else {
+    inp.removeAttribute('required');
+    inp.value = '';
+    if (lbl) lbl.textContent = 'Peso promedio (kg/cabeza)';
+  }
 }
 
-document.getElementById('form-salida').addEventListener('submit', e => {
+document.getElementById('form-salida').addEventListener('submit', async e => {
   e.preventDefault();
+  const cliente  = document.getElementById('s-cliente').value.trim();
+  const campoStr = document.getElementById('s-campo').value.trim();
+
+  // ── Validar cliente contra tabla ──
+  const okCliente = await validarYAgregarRef(cliente, clientes, 'Clientes',
+    () => COL.clientes().add({ nombre: cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' })
+  );
+  if (!okCliente) return;
+
+  // ── Validar campo contra tabla ──
+  const okCampo = await validarYAgregarRef(campoStr, campos, 'Campos',
+    () => COL.campos().add({ nombre: campoStr, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
+  );
+  if (!okCampo) return;
+
   const rec = {
     fecha:    document.getElementById('s-fecha').value,
-    cliente:  document.getElementById('s-cliente').value.trim(),
+    cliente,
     producto: document.getElementById('s-producto').value,
     cantidad: parseFloat(document.getElementById('s-cantidad').value) || 0,
     unidad:   document.getElementById('s-unidad').value.trim(),
-    campo:    document.getElementById('s-campo').value.trim(),
+    campo:    campoStr,
     patente:  document.getElementById('s-patente').value.trim().toUpperCase(),
     remito:   document.getElementById('s-remito').value.trim(),
     precio:   parseFloat(document.getElementById('s-precio').value) || 0,
@@ -1488,12 +1533,6 @@ document.getElementById('form-salida').addEventListener('submit', e => {
     notas:    document.getElementById('s-notas').value.trim(),
     creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
   };
-
-  // Auto-agregar cliente si no existe
-  const nombreCliente = rec.cliente.toLowerCase();
-  if (!clientes.find(c => c.nombre.toLowerCase() === nombreCliente)) {
-    COL.clientes().add({ nombre: rec.cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' });
-  }
 
   COL.salidas().add(rec).then(() => {
     resetSalida();
@@ -1635,18 +1674,43 @@ document.getElementById('i-tipo-ingreso').addEventListener('change', function() 
   document.getElementById('grp-proveedor').style.display = this.value === 'Proveedor' ? '' : 'none';
 });
 
-document.getElementById('form-ingreso').addEventListener('submit', e => {
+document.getElementById('form-ingreso').addEventListener('submit', async e => {
   e.preventDefault();
-  const prod     = document.getElementById('i-producto').value;
-  const pesoProm = HACIENDA.includes(prod) ? (parseFloat(document.getElementById('i-peso-prom').value) || 0) : 0;
+  const prod      = document.getElementById('i-producto').value;
+  const tipoIng   = document.getElementById('i-tipo-ingreso').value;
+  const proveedor = document.getElementById('i-proveedor').value.trim();
+  const origen    = document.getElementById('i-origen').value.trim();
+  const pesoProm  = HACIENDA.includes(prod) ? (parseFloat(document.getElementById('i-peso-prom').value) || 0) : 0;
+
+  // ── Validación: hacienda exige peso promedio > 0 ──
+  if (HACIENDA.includes(prod) && pesoProm <= 0) {
+    toast('⚠️ Para hacienda cargá el peso promedio (kg/cabeza)');
+    document.getElementById('i-peso-prom').focus();
+    return;
+  }
+
+  // ── Validar campo contra tabla ──
+  const okCampo = await validarYAgregarRef(origen, campos, 'Campos',
+    () => COL.campos().add({ nombre: origen, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
+  );
+  if (!okCampo) return;
+
+  // ── Validar proveedor solo si tipoIngreso es "Proveedor" ──
+  if (tipoIng === 'Proveedor') {
+    const okProv = await validarYAgregarRef(proveedor, proveedores, 'Proveedores',
+      () => COL.proveedores().add({ nombre: proveedor, cuit:'', tel:'', email:'', localidad:'', rubro:'', notas:'' })
+    );
+    if (!okProv) return;
+  }
+
   const rec = {
     fecha:        document.getElementById('i-fecha').value,
-    tipoIngreso:  document.getElementById('i-tipo-ingreso').value,
-    proveedor:    document.getElementById('i-proveedor').value.trim(),
+    tipoIngreso:  tipoIng,
+    proveedor,
     producto:     prod,
     cantidad:     parseFloat(document.getElementById('i-cantidad').value) || 0,
     unidad:       document.getElementById('i-unidad').value.trim(),
-    origen:       document.getElementById('i-origen').value.trim(),
+    origen,
     notas:        document.getElementById('i-notas').value.trim(),
     ...(pesoProm > 0 && { pesoProm }),
     creadoEn:     firebase.firestore.FieldValue.serverTimestamp(),
