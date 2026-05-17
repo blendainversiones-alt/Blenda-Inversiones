@@ -396,6 +396,21 @@
       <div class="stock-grid" id="dash-stock"></div>
     </div>
 
+    <!-- Cotizaciones -->
+    <div class="card">
+      <h2>📈 Cotizaciones del día</h2>
+      <div id="cotizaciones-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
+        <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando cotizaciones…</div>
+      </div>
+      <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.75rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+          <span style="font-size:.8rem;font-weight:700;color:var(--gray)">💰 VALORIZACIÓN DEL STOCK</span>
+          <span id="valor-total-stock" style="font-size:1rem;font-weight:800;color:var(--green-dark)">—</span>
+        </div>
+        <div id="valor-detalle-stock" style="margin-top:.5rem;font-size:.8rem;color:#4b5563"></div>
+      </div>
+    </div>
+
     <!-- Últimas salidas -->
     <div class="card">
       <h2>📤 Últimas salidas</h2>
@@ -407,6 +422,7 @@
               <th>Cliente</th>
               <th>Producto</th>
               <th>Cantidad</th>
+              <th>Campo carga</th>
               <th>Patente</th>
               <th>Remito</th>
               <th>Estado</th>
@@ -457,6 +473,11 @@
           <div class="form-group">
             <label for="s-unidad">Unidad</label>
             <input id="s-unidad" type="text" placeholder="ej: toneladas, cabezas, kg" />
+          </div>
+          <div class="form-group">
+            <label for="s-campo">Campo de carga 📍</label>
+            <input id="s-campo" type="text" list="lista-campos-salida" placeholder="¿Desde qué campo carga el camión?" />
+            <datalist id="lista-campos-salida"></datalist>
           </div>
           <div class="form-group">
             <label for="s-patente">Patente del camión</label>
@@ -523,6 +544,7 @@
               <th onclick="sortSalidas('cantidad')">Cantidad</th>
               <th>Precio unit.</th>
               <th>Total</th>
+              <th onclick="sortSalidas('campo')">Campo carga</th>
               <th>Patente</th>
               <th>Remito</th>
               <th onclick="sortSalidas('estado')">Estado</th>
@@ -869,6 +891,24 @@
   </div>
 </div>
 
+<!-- ── Modal PIN eliminar ── -->
+<div class="modal-backdrop" id="modal-pin">
+  <div class="modal" style="max-width:340px;text-align:center">
+    <div style="font-size:2rem;margin-bottom:.5rem">🔐</div>
+    <h3 style="text-align:center">Confirmar eliminación</h3>
+    <p style="font-size:.85rem;color:var(--gray);margin-bottom:1.25rem">Ingresá el PIN de 4 dígitos para eliminar este registro.</p>
+    <input id="pin-input" type="password" inputmode="numeric" maxlength="4"
+      placeholder="••••"
+      style="text-align:center;font-size:1.5rem;letter-spacing:.5rem;width:140px;margin:0 auto .5rem"
+      oninput="this.value=this.value.replace(/\D/g,'')" />
+    <p id="pin-error" style="color:var(--red);font-size:.8rem;height:1.1rem;margin-bottom:.5rem"></p>
+    <div class="form-actions" style="justify-content:center">
+      <button class="btn btn-secondary" onclick="closeModal('modal-pin')">Cancelar</button>
+      <button class="btn btn-danger" onclick="verificarPin()">Eliminar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── Modal editar salida ── -->
 <div class="modal-backdrop" id="modal-salida">
   <div class="modal">
@@ -901,6 +941,10 @@
         <div class="form-group">
           <label>Unidad</label>
           <input id="es-unidad" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Campo de carga 📍</label>
+          <input id="es-campo" type="text" list="lista-campos-salida" placeholder="¿Desde qué campo?" />
         </div>
         <div class="form-group">
           <label>Patente del camión</label>
@@ -1274,6 +1318,7 @@ function renderDashboard() {
         <td><strong>${esc(s.cliente)}</strong></td>
         <td>${ICONOS[s.producto]||''} ${esc(s.producto)}</td>
         <td>${fmtNum(s.cantidad)} ${esc(s.unidad||'')}</td>
+        <td>${s.campo ? `<span class="badge b-green">📍 ${esc(s.campo)}</span>` : '—'}</td>
         <td><code>${esc(s.patente||'—')}</code></td>
         <td><code>${esc(s.remito||'—')}</code></td>
         <td><span class="badge ${badgeSalida(s.estado)}">${esc(s.estado)}</span></td>
@@ -1316,6 +1361,7 @@ document.getElementById('form-salida').addEventListener('submit', e => {
     producto: document.getElementById('s-producto').value,
     cantidad: parseFloat(document.getElementById('s-cantidad').value) || 0,
     unidad:   document.getElementById('s-unidad').value.trim(),
+    campo:    document.getElementById('s-campo').value.trim(),
     patente:  document.getElementById('s-patente').value.trim().toUpperCase(),
     remito:   document.getElementById('s-remito').value.trim(),
     precio:   parseFloat(document.getElementById('s-precio').value) || 0,
@@ -1339,6 +1385,7 @@ document.getElementById('form-salida').addEventListener('submit', e => {
 function resetSalida() {
   document.getElementById('form-salida').reset();
   document.getElementById('s-fecha').value = todayISO();
+  document.getElementById('s-campo').value = '';
   document.getElementById('s-patente').value = '';
 }
 
@@ -1378,12 +1425,13 @@ function renderSalidas() {
       <td>${fmtNum(r.cantidad)} <small>${esc(r.unidad||'')}</small></td>
       <td>${fmtMoney(r.precio)}</td>
       <td>${total ? fmtMoney(total) : '—'}</td>
+      <td>${r.campo ? `<span class="badge b-green">📍 ${esc(r.campo)}</span>` : '—'}</td>
       <td><code>${esc(r.patente||'—')}</code></td>
       <td><code>${esc(r.remito||'—')}</code></td>
       <td><span class="badge ${badgeSalida(r.estado)}">${esc(r.estado)}</span></td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick="openEditSalida('${r.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteSalida('${r.id}')">Eliminar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteSalida('${r.id}'))">Eliminar</button>
       </td>
     </tr>`;
   }).join('');
@@ -1404,6 +1452,7 @@ function openEditSalida(id) {
   document.getElementById('es-producto').value = r.producto;
   document.getElementById('es-cantidad').value = r.cantidad;
   document.getElementById('es-unidad').value   = r.unidad;
+  document.getElementById('es-campo').value    = r.campo || '';
   document.getElementById('es-patente').value  = r.patente || '';
   document.getElementById('es-remito').value   = r.remito;
   document.getElementById('es-precio').value   = r.precio || '';
@@ -1421,6 +1470,7 @@ document.getElementById('form-edit-salida').addEventListener('submit', e => {
     producto: document.getElementById('es-producto').value,
     cantidad: parseFloat(document.getElementById('es-cantidad').value) || 0,
     unidad:   document.getElementById('es-unidad').value.trim(),
+    campo:    document.getElementById('es-campo').value.trim(),
     patente:  document.getElementById('es-patente').value.trim().toUpperCase(),
     remito:   document.getElementById('es-remito').value.trim(),
     precio:   parseFloat(document.getElementById('es-precio').value) || 0,
@@ -1442,11 +1492,11 @@ function deleteSalida(id) {
 function exportSalidasCSV() {
   const rows = salidas;
   if (!rows.length) { toast('No hay salidas para exportar'); return; }
-  const cols = ['Fecha','Cliente','Producto','Cantidad','Unidad','Precio Unitario','Total','Patente','Remito','Estado','Notas'];
+  const cols = ['Fecha','Cliente','Producto','Cantidad','Unidad','Precio Unitario','Total','Campo Carga','Patente','Remito','Estado','Notas'];
   const data = rows.map(r => [
     r.fecha, r.cliente, r.producto, r.cantidad, r.unidad,
     r.precio, (r.precio && r.cantidad ? r.precio * r.cantidad : ''),
-    r.patente, r.remito, r.estado, r.notas
+    r.campo, r.patente, r.remito, r.estado, r.notas
   ].map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
   downloadCSV([cols.join(','), ...data].join('\r\n'), `salidas_blenda_${todayISO()}.csv`);
   toast('📄 CSV exportado');
@@ -1648,7 +1698,7 @@ function renderClientes() {
       <td><span class="badge b-blue">${totalSalidas}</span></td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick="openEditCliente('${c.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteCliente('${c.id}')">Eliminar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteCliente('${c.id}'))">Eliminar</button>
       </td>
     </tr>`;
   }).join('');
@@ -1754,7 +1804,7 @@ function renderNotas() {
       <p style="font-size:.85rem;color:#374151;line-height:1.5;white-space:pre-wrap">${esc(n.texto)}</p>
       <div style="display:flex;gap:.5rem;margin-top:.25rem">
         <button class="btn btn-secondary btn-sm" onclick="openEditNota('${n.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteNota('${n.id}')">Eliminar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteNota('${n.id}'))">Eliminar</button>
       </div>
     </div>
   `).join('');
@@ -1814,6 +1864,7 @@ function renderAll() {
   renderClientes();
   renderCampos();
   renderNotas();
+  actualizarValorizacion();
 }
 
 // ═══════════════════════════════════════════
@@ -1847,9 +1898,12 @@ function renderCampos() {
   const q    = (document.getElementById('ca-search').value || '').toLowerCase();
   const fTip = document.getElementById('ca-filter-tipo').value;
 
-  // Actualizar datalist para ingresos
-  const dl = document.getElementById('lista-campos');
-  if (dl) dl.innerHTML = campos.map(c => `<option value="${esc(c.nombre)}">`).join('');
+  // Actualizar datalists de campos
+  const dl  = document.getElementById('lista-campos');
+  const dl2 = document.getElementById('lista-campos-salida');
+  const opts = campos.map(c => `<option value="${esc(c.nombre)}">`).join('');
+  if (dl)  dl.innerHTML  = opts;
+  if (dl2) dl2.innerHTML = opts;
 
   let rows = campos.filter(c => {
     const match = !q || [c.nombre,c.ubicacion,c.propietario].some(v => String(v||'').toLowerCase().includes(q));
@@ -1905,7 +1959,7 @@ function renderCampos() {
       ${c.notas ? `<p style="font-size:.78rem;color:#6b7280;font-style:italic">${esc(c.notas)}</p>` : ''}
       <div style="display:flex;gap:.5rem;margin-top:.25rem">
         <button class="btn btn-secondary btn-sm" onclick="openEditCampo('${c.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteCampo('${c.id}')">Eliminar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteCampo('${c.id}'))">Eliminar</button>
       </div>
     </div>`;
   }).join('');
@@ -1957,6 +2011,130 @@ function exportCamposCSV() {
   downloadCSV([cols.join(','), ...data].join('\r\n'), `campos_blenda_${todayISO()}.csv`);
   toast('📄 CSV exportado');
 }
+
+// ═══════════════════════════════════════════
+//  PIN DE SEGURIDAD PARA ELIMINAR
+// ═══════════════════════════════════════════
+
+const PIN_KEY = 'blenda_pin';
+let _pinCallback = null;
+
+function getPIN() { return localStorage.getItem(PIN_KEY) || '1234'; }
+
+function confirmarEliminar(callback) {
+  _pinCallback = callback;
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('modal-pin').classList.add('open');
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+
+function verificarPin() {
+  const ingresado = document.getElementById('pin-input').value;
+  if (ingresado === getPIN()) {
+    closeModal('modal-pin');
+    if (_pinCallback) { _pinCallback(); _pinCallback = null; }
+  } else {
+    document.getElementById('pin-error').textContent = '❌ PIN incorrecto. Intentá de nuevo.';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+
+// Enter en el input de PIN
+document.getElementById('pin-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') verificarPin();
+});
+
+// Reemplazar los deletes de otras entidades con PIN
+function deleteSalidaSegura(id)   { confirmarEliminar(() => deleteSalida(id)); }
+function deleteClienteSeguro(id)  { confirmarEliminar(() => deleteCliente(id)); }
+function deleteCampoSeguro(id)    { confirmarEliminar(() => deleteCampo(id)); }
+function deleteNotaSegura(id)     { confirmarEliminar(() => deleteNota(id)); }
+function deleteIngresoSeguro(id)  { confirmarEliminar(() => COL.ingresos().doc(id).delete().then(() => toast('🗑️ Ingreso eliminado'))); }
+
+// ═══════════════════════════════════════════
+//  COTIZACIONES Y VALORIZACIÓN DEL STOCK
+// ═══════════════════════════════════════════
+
+let preciosCot = {};  // precios por producto en ARS/tn o ARS/cabeza
+
+async function cargarCotizaciones() {
+  const grid = document.getElementById('cotizaciones-grid');
+  if (!grid) return;
+
+  try {
+    // 1. Tipo de cambio
+    const resDolar = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    const dolarData = await resDolar.json();
+    const usdARS = dolarData.venta || 1;
+
+    // 2. Precios de granos en USD/bushel desde Yahoo Finance (proxy público)
+    const granos = [
+      { key: 'Soja',  ticker: 'ZS=F', bushelsPerTon: 36.7437, label: 'Soja' },
+      { key: 'Maíz',  ticker: 'ZC=F', bushelsPerTon: 39.3683, label: 'Maíz' },
+      { key: 'Trigo', ticker: 'ZW=F', bushelsPerTon: 36.7437, label: 'Trigo' },
+    ];
+
+    const precios = {};
+    await Promise.all(granos.map(async g => {
+      try {
+        const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`);
+        const d = await r.json();
+        const pUSD = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (pUSD) precios[g.key] = { usd: (pUSD / g.bushelsPerTon), ars: (pUSD / g.bushelsPerTon) * usdARS, label: g.label };
+      } catch(e) {}
+    }));
+
+    // 3. Render cotizaciones
+    const items = [
+      { label: '💵 Dólar oficial', valor: `$${fmtNum(usdARS)}`, sub: 'por USD' },
+      ...Object.values(precios).map(p => ({
+        label: `${ICONOS[p.label]||''} ${p.label}`,
+        valor: `$${fmtNum(Math.round(p.ars))}`,
+        sub: `${fmtNum(Math.round(p.usd))} USD/tn · CBOT`,
+      })),
+    ];
+
+    grid.innerHTML = items.map(it => `
+      <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
+        <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
+        <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
+        <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
+      </div>
+    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">Fuentes: dolarapi.com · Yahoo Finance (CBOT)<br>Actualizado: ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</div>`;
+
+    // 4. Guardar precios para valorización
+    preciosCot = precios;
+    actualizarValorizacion();
+
+  } catch(e) {
+    grid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⚠️ No se pudieron cargar las cotizaciones. Revisá la conexión.</div>`;
+  }
+}
+
+function actualizarValorizacion() {
+  const stock = calcStock();
+  let totalARS = 0;
+  const detalles = [];
+
+  PRODUCTOS.forEach(p => {
+    const cant = stock[p] || 0;
+    if (cant <= 0 || !preciosCot[p]) return;
+    const valorARS = cant * preciosCot[p].ars;
+    totalARS += valorARS;
+    detalles.push(`${ICONOS[p]||''} ${p}: ${fmtNum(cant)} tn × $${fmtNum(Math.round(preciosCot[p].ars))}/tn = <strong>$${fmtNum(Math.round(valorARS))}</strong>`);
+  });
+
+  const elTotal  = document.getElementById('valor-total-stock');
+  const elDetalle = document.getElementById('valor-detalle-stock');
+  if (elTotal) elTotal.textContent = totalARS > 0 ? `$${fmtNum(Math.round(totalARS))} ARS` : '—';
+  if (elDetalle) elDetalle.innerHTML = detalles.length ? detalles.join(' &nbsp;|&nbsp; ') : '<span style="color:var(--gray)">Cargá stock de granos para ver la valorización.</span>';
+}
+
+// Cargar cotizaciones al arrancar y cada 15 minutos
+cargarCotizaciones();
+setInterval(cargarCotizaciones, 15 * 60 * 1000);
 
 // ── Boot: los listeners de Firestore arrancan solos y llaman renderAll() cuando cargan ──
 </script>
