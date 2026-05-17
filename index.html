@@ -633,9 +633,9 @@
       <div class="stock-grid" id="stock-detalle"></div>
     </div>
 
-    <!-- Historial de movimientos -->
+    <!-- Historial de ingresos -->
     <div class="card">
-      <h2>🔄 Historial de movimientos</h2>
+      <h2>📋 Historial de ingresos</h2>
       <div class="toolbar">
         <input id="m-search" type="search" placeholder="Buscar…" oninput="renderMovimientos()" />
         <select id="m-filter-prod" onchange="renderMovimientos()" style="width:auto;min-width:160px;">
@@ -646,11 +646,6 @@
           <option value="Hacienda Engorde">Hacienda Engorde</option>
           <option value="Hacienda Recría">Hacienda Recría</option>
           <option value="Otro">Otro</option>
-        </select>
-        <select id="m-filter-tipo" onchange="renderMovimientos()" style="width:auto;min-width:120px;">
-          <option value="">Todos</option>
-          <option value="Ingreso">Ingreso</option>
-          <option value="Salida">Salida</option>
         </select>
         <button class="btn btn-blue btn-sm" onclick="exportMovimientosCSV()">Exportar CSV</button>
       </div>
@@ -663,8 +658,10 @@
               <th>Producto</th>
               <th>Cantidad</th>
               <th>Unidad</th>
-              <th>Referencia</th>
+              <th>Campo / Lote</th>
+              <th>Proveedor</th>
               <th>Notas</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody id="tabla-movimientos"></tbody>
@@ -1612,10 +1609,7 @@ function renderStock() {
     porcampo[i.producto][campo] = (porcampo[i.producto][campo]||0) + (parseFloat(i.cantidad)||0);
   });
 
-  // Actualizar datalist de campos
-  const todosLosCampos = [...new Set(ingresos.map(i => i.origen).filter(Boolean))];
-  const dl = document.getElementById('lista-campos');
-  if (dl) dl.innerHTML = todosLosCampos.map(c => `<option value="${esc(c)}">`).join('');
+  // Los datalists se actualizan en renderCampos(), renderClientes() y renderProveedores()
 
   // Solo mostrar productos con movimientos
   const productosActivos = PRODUCTOS.filter(p => totIng[p] > 0 || totSal[p] > 0);
@@ -1661,59 +1655,62 @@ function renderStock() {
 }
 
 function renderMovimientos() {
-  const q     = (document.getElementById('m-search').value || '').toLowerCase();
-  const fProd = document.getElementById('m-filter-prod').value;
-  const fTipo = document.getElementById('m-filter-tipo').value;
+  const q     = (document.getElementById('m-search')?.value || '').toLowerCase();
+  const fProd = document.getElementById('m-filter-prod')?.value || '';
 
-  const movIngresos = ingresos.map(i => ({ ...i, tipo: 'Ingreso', ref: i.origen || '—' }));
-  const movSalidas  = salidas.map(s => ({ ...s, tipo: 'Salida', ref: s.remito || s.cliente || '—' }));
-  let rows = [...movIngresos, ...movSalidas];
-
-  rows.sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+  let rows = [...ingresos].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
 
   rows = rows.filter(r => {
-    const match = !q || [r.producto,r.tipo,r.ref,r.notas].some(v => String(v||'').toLowerCase().includes(q));
-    const pOk   = !fProd || r.producto === fProd;
-    const tOk   = !fTipo || r.tipo === fTipo;
-    return match && pOk && tOk;
+    const match = !q || [r.producto, r.tipoIngreso, r.origen, r.proveedor, r.notas]
+      .some(v => String(v||'').toLowerCase().includes(q));
+    const pOk = !fProd || r.producto === fProd;
+    return match && pOk;
   });
 
   const tbody = document.getElementById('tabla-movimientos');
+  if (!tbody) return;
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-msg">No hay movimientos que coincidan.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">No hay ingresos que coincidan.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = rows.map(r => {
-    const tipoLabel = r.tipo === 'Ingreso'
-      ? (r.tipoIngreso === 'Existencia inicial' ? '📋 Existencia inicial'
-        : r.tipoIngreso === 'Cosecha' ? '🌾 Cosecha'
-        : r.tipoIngreso === 'Proveedor' ? `🚚 Proveedor${r.proveedor ? ': '+r.proveedor : ''}`
-        : '📦 Ingreso')
-      : '📤 Salida';
+    const tipoLabel =
+        r.tipoIngreso === 'Existencia inicial' ? '📋 Existencia inicial'
+      : r.tipoIngreso === 'Cosecha'   ? '🌾 Cosecha propia'
+      : r.tipoIngreso === 'Proveedor' ? '🚚 Compra proveedor'
+      : '📦 Otro';
     return `
     <tr>
       <td>${fmtDate(r.fecha)}</td>
-      <td><span class="badge ${r.tipo==='Ingreso'?'b-green':'b-red'}">${tipoLabel}</span></td>
+      <td><span class="badge b-green">${tipoLabel}</span></td>
       <td>${ICONOS[r.producto]||''} ${esc(r.producto)}</td>
-      <td style="font-weight:600">${r.tipo==='Salida'?'-':'+'} ${fmtNum(r.cantidad)}</td>
+      <td style="font-weight:600">+${fmtNum(r.cantidad)}</td>
       <td>${esc(r.unidad||'')}</td>
-      <td><code>${esc(r.ref)}</code></td>
+      <td>${r.origen ? `<span class="badge b-green">📍 ${esc(r.origen)}</span>` : '—'}</td>
+      <td>${esc(r.proveedor||'—')}</td>
       <td style="color:var(--gray);font-size:.82rem">${esc(r.notas||'—')}</td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteIngreso('${r.id}'))">🗑️</button>
+      </td>
     </tr>`;
   }).join('');
 }
 
+function deleteIngreso(id) {
+  COL.ingresos().doc(id).delete()
+    .then(() => toast('🗑️ Ingreso eliminado'))
+    .catch(() => toast('❌ Error al eliminar.'));
+}
+
 function exportMovimientosCSV() {
-  const rows = [
-    ...ingresos.map(i => ({ ...i, tipo: 'Ingreso' })),
-    ...salidas.map(s => ({ ...s, tipo: 'Salida' }))
-  ].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
-  if (!rows.length) { toast('No hay movimientos'); return; }
-  const cols = ['Fecha','Tipo','Producto','Cantidad','Unidad','Notas'];
-  const data = rows.map(r => [r.fecha, r.tipo, r.producto, r.cantidad, r.unidad, r.notas]
-    .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
-  downloadCSV([cols.join(','), ...data].join('\r\n'), `movimientos_blenda_${todayISO()}.csv`);
+  if (!ingresos.length) { toast('No hay ingresos'); return; }
+  const cols = ['Fecha','Tipo','Producto','Cantidad','Unidad','Campo/Lote','Proveedor','Notas'];
+  const data = [...ingresos]
+    .sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''))
+    .map(r => [r.fecha, r.tipoIngreso||'Ingreso', r.producto, r.cantidad, r.unidad, r.origen, r.proveedor, r.notas]
+      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
+  downloadCSV([cols.join(','), ...data].join('\r\n'), `ingresos_blenda_${todayISO()}.csv`);
   toast('📄 CSV exportado');
 }
 
@@ -1748,9 +1745,9 @@ function renderClientes() {
     !q || [c.nombre,c.cuit,c.tel,c.email,c.localidad].some(v => String(v||'').toLowerCase().includes(q))
   );
 
-  // Datalist autocomplete
-  const dl = document.getElementById('lista-clientes');
-  dl.innerHTML = clientes.map(c => `<option value="${esc(c.nombre)}">`).join('');
+  // Datalist autocomplete — todos los inputs que usan lista-clientes
+  const optsClientes = clientes.map(c => `<option value="${esc(c.nombre)}">`).join('');
+  document.querySelectorAll('#lista-clientes').forEach(dl => { if (dl) dl.innerHTML = optsClientes; });
 
   const tbody = document.getElementById('tabla-clientes');
   if (rows.length === 0) {
@@ -1971,12 +1968,16 @@ function renderCampos() {
   const q    = (document.getElementById('ca-search').value || '').toLowerCase();
   const fTip = document.getElementById('ca-filter-tipo').value;
 
-  // Actualizar datalists de campos
-  const dl  = document.getElementById('lista-campos');
-  const dl2 = document.getElementById('lista-campos-salida');
-  const opts = campos.map(c => `<option value="${esc(c.nombre)}">`).join('');
-  if (dl)  dl.innerHTML  = opts;
-  if (dl2) dl2.innerHTML = opts;
+  // Actualizar TODOS los datalists de campos (ingresos + egresos)
+  // Combinar campos registrados + valores históricos de ingresos
+  const nombresCampos = [
+    ...campos.map(c => c.nombre),
+    ...ingresos.map(i => i.origen).filter(Boolean),
+  ];
+  const optsUnicos = [...new Set(nombresCampos)].map(n => `<option value="${esc(n)}">`).join('');
+  document.querySelectorAll('#lista-campos, #lista-campos-salida').forEach(dl => {
+    if (dl) dl.innerHTML = optsUnicos;
+  });
 
   let rows = campos.filter(c => {
     const match = !q || [c.nombre,c.ubicacion,c.propietario].some(v => String(v||'').toLowerCase().includes(q));
@@ -2111,9 +2112,9 @@ document.getElementById('form-proveedor').addEventListener('submit', e => {
 function resetProveedor() { document.getElementById('form-proveedor').reset(); }
 
 function renderProveedores() {
-  // Actualizar datalist de proveedores en ingresos
-  const dlPv = document.getElementById('lista-proveedores');
-  if (dlPv) dlPv.innerHTML = proveedores.map(p => `<option value="${esc(p.nombre)}">`).join('');
+  // Datalist proveedores en ingresos
+  const optsPv = proveedores.map(p => `<option value="${esc(p.nombre)}">`).join('');
+  document.querySelectorAll('#lista-proveedores').forEach(dl => { if (dl) dl.innerHTML = optsPv; });
 
   const q = (document.getElementById('pv-search')?.value || '').toLowerCase();
   const rows = proveedores.filter(p =>
