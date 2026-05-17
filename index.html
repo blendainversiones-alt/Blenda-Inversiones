@@ -589,6 +589,7 @@
             <label for="i-tipo-ingreso">Tipo de ingreso *</label>
             <select id="i-tipo-ingreso" required>
               <option value="">— Seleccionar —</option>
+              <option value="Existencia inicial">📋 Existencia inicial</option>
               <option value="Cosecha">🌾 Cosecha propia</option>
               <option value="Proveedor">🚚 Compra a proveedor</option>
               <option value="Otro">📦 Otro</option>
@@ -1658,7 +1659,10 @@ function renderMovimientos() {
 
   tbody.innerHTML = rows.map(r => {
     const tipoLabel = r.tipo === 'Ingreso'
-      ? (r.tipoIngreso === 'Cosecha' ? '🌾 Cosecha' : r.tipoIngreso === 'Proveedor' ? `🚚 Proveedor${r.proveedor ? ': '+r.proveedor : ''}` : '📦 Ingreso')
+      ? (r.tipoIngreso === 'Existencia inicial' ? '📋 Existencia inicial'
+        : r.tipoIngreso === 'Cosecha' ? '🌾 Cosecha'
+        : r.tipoIngreso === 'Proveedor' ? `🚚 Proveedor${r.proveedor ? ': '+r.proveedor : ''}`
+        : '📦 Ingreso')
       : '📤 Salida';
     return `
     <tr>
