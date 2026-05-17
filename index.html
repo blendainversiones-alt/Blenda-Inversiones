@@ -388,6 +388,7 @@
   <div class="tab active" onclick="showPage('dashboard', this)">📊 Inicio</div>
   <div class="tab" onclick="showPage('stock', this)">📥 Ingresos</div>
   <div class="tab" onclick="showPage('salidas', this)">📤 Egresos</div>
+  <div class="tab" onclick="showPage('resumen', this)">📈 Resumen</div>
   <div class="tab" onclick="showPage('tablas', this)">📋 Tablas</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
@@ -670,6 +671,62 @@
             </tr>
           </thead>
           <tbody id="tabla-movimientos"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ RESUMEN ═══════════════════════════════ -->
+<div class="page" id="page-resumen">
+  <div class="container">
+
+    <!-- Filtros -->
+    <div class="card">
+      <h2>📈 Resumen de movimientos</h2>
+      <div class="toolbar" style="flex-wrap:wrap;gap:.6rem;margin-top:.75rem">
+        <select id="r-producto" onchange="renderResumen()" style="min-width:180px">
+          <option value="">Todos los productos</option>
+          <option value="Maíz">🌽 Maíz</option>
+          <option value="Soja">🌿 Soja</option>
+          <option value="Trigo">🌾 Trigo</option>
+          <option value="Hacienda Engorde">🐄 Hacienda Engorde</option>
+          <option value="Hacienda Recría">🐂 Hacienda Recría</option>
+          <option value="Otro">📦 Otro</option>
+        </select>
+        <label style="font-size:.82rem;font-weight:600;color:var(--gray);align-self:center">Desde</label>
+        <input id="r-desde" type="date" onchange="renderResumen()" style="width:auto" />
+        <label style="font-size:.82rem;font-weight:600;color:var(--gray);align-self:center">Hasta</label>
+        <input id="r-hasta" type="date" onchange="renderResumen()" style="width:auto" />
+        <button class="btn btn-secondary btn-sm" onclick="limpiarFiltrosResumen()">Limpiar filtros</button>
+        <button class="btn btn-blue btn-sm" onclick="exportResumenCSV()">Exportar CSV</button>
+      </div>
+    </div>
+
+    <!-- Tarjetas resumen por producto -->
+    <div id="resumen-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem"></div>
+
+    <!-- Tabla de movimientos -->
+    <div class="card">
+      <h2>📋 Detalle de movimientos</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Tipo</th>
+              <th>Producto</th>
+              <th>Cantidad</th>
+              <th>Unidad</th>
+              <th>Campo / Lote</th>
+              <th>Cliente / Proveedor</th>
+              <th>Precio unit.</th>
+              <th>Total $</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-resumen"></tbody>
         </table>
       </div>
     </div>
@@ -1570,6 +1627,9 @@ function exportSalidasCSV() {
 
 document.getElementById('i-fecha').value = todayISO();
 
+// Fecha hasta = hoy por defecto en resumen
+document.getElementById('r-hasta').value = todayISO();
+
 // Mostrar/ocultar campo proveedor según tipo
 document.getElementById('i-tipo-ingreso').addEventListener('change', function() {
   document.getElementById('grp-proveedor').style.display = this.value === 'Proveedor' ? '' : 'none';
@@ -1935,6 +1995,176 @@ function downloadCSV(content, filename) {
 }
 
 // ═══════════════════════════════════════════
+//  RESUMEN
+// ═══════════════════════════════════════════
+
+function limpiarFiltrosResumen() {
+  document.getElementById('r-producto').value = '';
+  document.getElementById('r-desde').value    = '';
+  document.getElementById('r-hasta').value    = '';
+  renderResumen();
+}
+
+function renderResumen() {
+  const fProd  = document.getElementById('r-producto')?.value || '';
+  const fDesde = document.getElementById('r-desde')?.value   || '';
+  const fHasta = document.getElementById('r-hasta')?.value   || '';
+
+  // Filtrar ingresos
+  const ingFilt = ingresos.filter(r => {
+    const pOk = !fProd  || r.producto === fProd;
+    const dOk = !fDesde || r.fecha >= fDesde;
+    const hOk = !fHasta || r.fecha <= fHasta;
+    return pOk && dOk && hOk;
+  });
+
+  // Filtrar salidas
+  const salFilt = salidas.filter(r => {
+    const pOk = !fProd  || r.producto === fProd;
+    const dOk = !fDesde || r.fecha >= fDesde;
+    const hOk = !fHasta || r.fecha <= fHasta;
+    return pOk && dOk && hOk;
+  });
+
+  // Agrupar por producto
+  const prods = [...new Set([
+    ...ingFilt.map(r => r.producto),
+    ...salFilt.map(r => r.producto),
+  ])].filter(Boolean);
+
+  // ── Tarjetas por producto ──
+  const cardsEl = document.getElementById('resumen-cards');
+  if (!cardsEl) return;
+
+  if (prods.length === 0) {
+    cardsEl.innerHTML = `<p class="empty-msg" style="grid-column:1/-1">No hay movimientos con esos filtros.</p>`;
+  } else {
+    cardsEl.innerHTML = prods.sort().map(p => {
+      const ings = ingFilt.filter(r => r.producto === p);
+      const sals = salFilt.filter(r => r.producto === p);
+      const totalIng = ings.reduce((s, r) => s + (parseFloat(r.cantidad)||0), 0);
+      const totalSal = sals.reduce((s, r) => s + (parseFloat(r.cantidad)||0), 0);
+      const saldo    = totalIng - totalSal;
+      const unidad   = UNIDADES[p] || '';
+      const negativo = saldo < 0;
+
+      // Monto total de salidas con precio
+      const montoSal = sals.reduce((s, r) => {
+        const t = (parseFloat(r.precio)||0) * (parseFloat(r.cantidad)||0);
+        return s + t;
+      }, 0);
+
+      return `
+      <div style="background:#fff;border-radius:10px;padding:1.1rem 1.25rem;box-shadow:var(--shadow);border-top:4px solid var(--green);display:flex;flex-direction:column;gap:.5rem">
+        <div style="display:flex;align-items:center;gap:.5rem;font-size:1rem;font-weight:800;color:var(--gray-dark)">
+          <span style="font-size:1.4rem">${ICONOS[p]||'📦'}</span>${p}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem .75rem;font-size:.8rem;margin-top:.2rem">
+          <div style="display:flex;flex-direction:column;background:var(--green-light);border-radius:7px;padding:.5rem .75rem">
+            <span style="font-size:.65rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.4px">Ingresos</span>
+            <span style="font-size:1rem;font-weight:800;color:var(--green-dark)">${fmtNum(totalIng)} <small style="font-size:.65rem">${unidad}</small></span>
+            <span style="font-size:.7rem;color:var(--gray)">${ings.length} registro${ings.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;background:var(--red-light);border-radius:7px;padding:.5rem .75rem">
+            <span style="font-size:.65rem;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.4px">Egresos</span>
+            <span style="font-size:1rem;font-weight:800;color:var(--red)">${fmtNum(totalSal)} <small style="font-size:.65rem">${unidad}</small></span>
+            <span style="font-size:.7rem;color:var(--gray)">${sals.length} registro${sals.length !== 1 ? 's' : ''}</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:.5rem;margin-top:.1rem">
+          <span style="font-size:.75rem;font-weight:700;color:var(--gray)">Saldo</span>
+          <span style="font-size:1.05rem;font-weight:800;color:${negativo?'var(--red)':'var(--green-dark)'}">
+            ${negativo?'':'+'} ${fmtNum(saldo)} ${unidad}
+          </span>
+        </div>
+        ${montoSal > 0 ? `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--gray)">Facturado</span>
+          <span style="font-size:.88rem;font-weight:700;color:#1e40af">$${fmtNum(Math.round(montoSal))}</span>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  // ── Tabla detalle de movimientos ──
+  const tbody = document.getElementById('tabla-resumen');
+  if (!tbody) return;
+
+  // Combinar y ordenar por fecha desc
+  const movs = [
+    ...ingFilt.map(r => ({ ...r, _tipo: 'Ingreso' })),
+    ...salFilt.map(r => ({ ...r, _tipo: 'Egreso'  })),
+  ].sort((a, b) => (b.fecha||'').localeCompare(a.fecha||''));
+
+  if (movs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-msg">No hay movimientos con esos filtros.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = movs.map(r => {
+    const esIngreso = r._tipo === 'Ingreso';
+    const cantHTML  = esIngreso
+      ? `<span style="color:var(--green-dark);font-weight:700">+${fmtNum(r.cantidad)}</span>`
+      : `<span style="color:var(--red);font-weight:700">−${fmtNum(r.cantidad)}</span>`;
+    const contraparte = esIngreso
+      ? esc(r.proveedor || r.tipoIngreso || '—')
+      : esc(r.cliente || '—');
+    const precio = !esIngreso && r.precio ? fmtMoney(r.precio) : '—';
+    const total  = !esIngreso && r.precio && r.cantidad ? '$'+fmtNum(Math.round(r.precio * r.cantidad)) : '—';
+    const estado = !esIngreso
+      ? `<span class="badge ${badgeSalida(r.estado)}">${esc(r.estado||'')}</span>`
+      : `<span class="badge b-green">${esc(r.tipoIngreso||'Ingreso')}</span>`;
+    const campo  = esIngreso ? (r.origen||'—') : (r.campo||'—');
+
+    return `
+    <tr>
+      <td>${fmtDate(r.fecha)}</td>
+      <td><span class="badge ${esIngreso?'b-green':'b-red'}">${r._tipo}</span></td>
+      <td>${ICONOS[r.producto]||''} ${esc(r.producto||'')}</td>
+      <td>${cantHTML}</td>
+      <td style="color:var(--gray);font-size:.82rem">${esc(r.unidad||'')}</td>
+      <td>${campo !== '—' ? `<span class="badge b-blue">📍 ${esc(campo)}</span>` : '—'}</td>
+      <td>${contraparte}</td>
+      <td>${precio}</td>
+      <td style="font-weight:600">${total}</td>
+      <td>${estado}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportResumenCSV() {
+  const fProd  = document.getElementById('r-producto')?.value || '';
+  const fDesde = document.getElementById('r-desde')?.value   || '';
+  const fHasta = document.getElementById('r-hasta')?.value   || '';
+
+  const ingFilt = ingresos.filter(r => {
+    return (!fProd||r.producto===fProd) && (!fDesde||r.fecha>=fDesde) && (!fHasta||r.fecha<=fHasta);
+  });
+  const salFilt = salidas.filter(r => {
+    return (!fProd||r.producto===fProd) && (!fDesde||r.fecha>=fDesde) && (!fHasta||r.fecha<=fHasta);
+  });
+
+  const movs = [
+    ...ingFilt.map(r => ({ ...r, _tipo:'Ingreso' })),
+    ...salFilt.map(r => ({ ...r, _tipo:'Egreso'  })),
+  ].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
+
+  if (!movs.length) { toast('No hay movimientos para exportar'); return; }
+
+  const cols = ['Fecha','Tipo','Producto','Cantidad','Unidad','Campo/Lote','Cliente/Proveedor','Precio unitario','Total','Estado'];
+  const data = movs.map(r => {
+    const contraparte = r._tipo==='Ingreso' ? (r.proveedor||r.tipoIngreso||'') : (r.cliente||'');
+    const campo = r._tipo==='Ingreso' ? (r.origen||'') : (r.campo||'');
+    const signo = r._tipo==='Ingreso' ? r.cantidad : -r.cantidad;
+    const total = r.precio && r.cantidad ? r.precio * r.cantidad : '';
+    return [r.fecha, r._tipo, r.producto, signo, r.unidad||'', campo, contraparte, r.precio||'', total, r.estado||r.tipoIngreso||'']
+      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',');
+  });
+  downloadCSV([cols.join(','), ...data].join('\r\n'), `resumen_blenda_${todayISO()}.csv`);
+  toast('📄 CSV exportado');
+}
+
+// ═══════════════════════════════════════════
 //  RENDER ALL
 // ═══════════════════════════════════════════
 
@@ -1943,6 +2173,7 @@ function renderAll() {
   renderSalidas();
   renderStock();
   renderMovimientos();
+  renderResumen();
   renderClientes();
   renderCampos();
   renderProveedores();
