@@ -1977,6 +1977,25 @@ document.getElementById('form-campo').addEventListener('submit', e => {
 
 function resetCampo() { document.getElementById('form-campo').reset(); }
 
+// Navega al formulario de ingreso o egreso con el campo pre-seleccionado
+function irAFormCampo(tipo, nombreCampo) {
+  if (tipo === 'ingreso') {
+    // Ir a tab Ingresos
+    const tab = document.querySelector('.tab[onclick*="stock"]');
+    showPage('stock', tab);
+    document.getElementById('i-origen').value = nombreCampo;
+    document.getElementById('i-origen').focus();
+    document.getElementById('i-origen').scrollIntoView({ behavior:'smooth', block:'center' });
+  } else {
+    // Ir a tab Egresos
+    const tab = document.querySelector('.tab[onclick*="salidas"]');
+    showPage('salidas', tab);
+    document.getElementById('s-campo').value = nombreCampo;
+    document.getElementById('s-campo').focus();
+    document.getElementById('s-campo').scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+}
+
 function renderCampos() {
   const q    = (document.getElementById('ca-search').value || '').toLowerCase();
   const fTip = document.getElementById('ca-filter-tipo').value;
@@ -2044,7 +2063,9 @@ function renderCampos() {
         ${stockHTML}
       </div>
       ${c.notas ? `<p style="font-size:.78rem;color:#6b7280;font-style:italic">${esc(c.notas)}</p>` : ''}
-      <div style="display:flex;gap:.5rem;margin-top:.25rem">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem">
+        <button class="btn btn-primary btn-sm" onclick="irAFormCampo('ingreso','${esc(c.nombre)}')">📥 Ingreso</button>
+        <button class="btn btn-secondary btn-sm" style="background:#ede9fe;color:#5b21b6;border-color:#c4b5fd" onclick="irAFormCampo('egreso','${esc(c.nombre)}')">📤 Egreso</button>
         <button class="btn btn-secondary btn-sm" onclick="openEditCampo('${c.id}')">Editar</button>
         <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteCampo('${c.id}'))">Eliminar</button>
       </div>
