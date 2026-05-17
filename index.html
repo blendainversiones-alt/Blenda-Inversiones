@@ -586,6 +586,19 @@
             </select>
           </div>
           <div class="form-group">
+            <label for="i-tipo-ingreso">Tipo de ingreso *</label>
+            <select id="i-tipo-ingreso" required>
+              <option value="">— Seleccionar —</option>
+              <option value="Cosecha">🌾 Cosecha propia</option>
+              <option value="Proveedor">🚚 Compra a proveedor</option>
+              <option value="Otro">📦 Otro</option>
+            </select>
+          </div>
+          <div class="form-group" id="grp-proveedor" style="display:none">
+            <label for="i-proveedor">Proveedor</label>
+            <input id="i-proveedor" type="text" placeholder="Nombre del proveedor" />
+          </div>
+          <div class="form-group">
             <label for="i-cantidad">Cantidad *</label>
             <input id="i-cantidad" type="number" min="0" step="any" placeholder="0" required />
           </div>
@@ -1508,16 +1521,23 @@ function exportSalidasCSV() {
 
 document.getElementById('i-fecha').value = todayISO();
 
+// Mostrar/ocultar campo proveedor según tipo
+document.getElementById('i-tipo-ingreso').addEventListener('change', function() {
+  document.getElementById('grp-proveedor').style.display = this.value === 'Proveedor' ? '' : 'none';
+});
+
 document.getElementById('form-ingreso').addEventListener('submit', e => {
   e.preventDefault();
   const rec = {
-    fecha:    document.getElementById('i-fecha').value,
-    producto: document.getElementById('i-producto').value,
-    cantidad: parseFloat(document.getElementById('i-cantidad').value) || 0,
-    unidad:   document.getElementById('i-unidad').value.trim(),
-    origen:   document.getElementById('i-origen').value.trim(),
-    notas:    document.getElementById('i-notas').value.trim(),
-    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+    fecha:        document.getElementById('i-fecha').value,
+    tipoIngreso:  document.getElementById('i-tipo-ingreso').value,
+    proveedor:    document.getElementById('i-proveedor').value.trim(),
+    producto:     document.getElementById('i-producto').value,
+    cantidad:     parseFloat(document.getElementById('i-cantidad').value) || 0,
+    unidad:       document.getElementById('i-unidad').value.trim(),
+    origen:       document.getElementById('i-origen').value.trim(),
+    notas:        document.getElementById('i-notas').value.trim(),
+    creadoEn:     firebase.firestore.FieldValue.serverTimestamp(),
   };
   COL.ingresos().add(rec).then(() => {
     resetIngreso();
@@ -1528,6 +1548,7 @@ document.getElementById('form-ingreso').addEventListener('submit', e => {
 function resetIngreso() {
   document.getElementById('form-ingreso').reset();
   document.getElementById('i-fecha').value = todayISO();
+  document.getElementById('grp-proveedor').style.display = 'none';
 }
 
 function renderStock() {
@@ -1619,17 +1640,21 @@ function renderMovimientos() {
     return;
   }
 
-  tbody.innerHTML = rows.map(r => `
+  tbody.innerHTML = rows.map(r => {
+    const tipoLabel = r.tipo === 'Ingreso'
+      ? (r.tipoIngreso === 'Cosecha' ? '🌾 Cosecha' : r.tipoIngreso === 'Proveedor' ? `🚚 Proveedor${r.proveedor ? ': '+r.proveedor : ''}` : '📦 Ingreso')
+      : '📤 Salida';
+    return `
     <tr>
       <td>${fmtDate(r.fecha)}</td>
-      <td><span class="badge ${r.tipo==='Ingreso'?'b-green':'b-red'}">${r.tipo}</span></td>
+      <td><span class="badge ${r.tipo==='Ingreso'?'b-green':'b-red'}">${tipoLabel}</span></td>
       <td>${ICONOS[r.producto]||''} ${esc(r.producto)}</td>
       <td style="font-weight:600">${r.tipo==='Salida'?'-':'+'} ${fmtNum(r.cantidad)}</td>
       <td>${esc(r.unidad||'')}</td>
       <td><code>${esc(r.ref)}</code></td>
       <td style="color:var(--gray);font-size:.82rem">${esc(r.notas||'—')}</td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 function exportMovimientosCSV() {
