@@ -404,9 +404,9 @@
       <div class="stock-grid" id="dash-stock"></div>
     </div>
 
-    <!-- Cotizaciones + Flete + Valorización -->
+    <!-- Granos: Cotizaciones + Flete + Valorización -->
     <div class="card">
-      <h2>📈 Precios del día</h2>
+      <h2>🌾 Granos — Precios del día</h2>
       <div id="cotizaciones-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
         <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando cotizaciones…</div>
       </div>
@@ -424,6 +424,14 @@
           <span id="valor-total-stock" style="font-size:1rem;font-weight:800;color:var(--green-dark)">—</span>
         </div>
         <div id="valor-detalle-stock" style="margin-top:.5rem;font-size:.8rem;color:#4b5563"></div>
+      </div>
+    </div>
+
+    <!-- Hacienda: Precios Liniers -->
+    <div class="card">
+      <h2>🐄 Hacienda — Precios Liniers</h2>
+      <div id="hacienda-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
+        <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando precios hacienda…</div>
       </div>
     </div>
 
@@ -2540,27 +2548,37 @@ async function cargarPreciosHacienda() {
   if (precioEngorde) preciosCot['Hacienda Engorde'] = { ars: precioEngorde, label: 'Hacienda Engorde', fuente: 'Liniers' };
   if (precioRecriar) preciosCot['Hacienda Recría']  = { ars: precioRecriar, label: 'Hacienda Recría',  fuente: 'Invernada' };
 
-  // Render cards de hacienda dentro del grid de cotizaciones
-  const grid = document.getElementById('cotizaciones-grid');
-  if (!grid) return;
+  // Render en el div dedicado para hacienda
+  const hGrid = document.getElementById('hacienda-grid');
+  if (!hGrid) return;
 
-  // Quitar cards de hacienda anteriores (si ya existían por recarga)
-  grid.querySelectorAll('.hac-card').forEach(el => el.remove());
+  const hora = new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
 
-  const lastDiv = grid.lastElementChild;
-  [
-    precioEngorde ? { label:'🐄 Hacienda Engorde', valor:`$${fmtNum(Math.round(precioEngorde))}/kg`, sub:'Novillito/Novillo · Liniers' } : null,
-    precioRecriar ? { label:'🐂 Hacienda Recría',  valor:`$${fmtNum(Math.round(precioRecriar))}/kg`,  sub:'Ternero invernada'           } : null,
-  ].filter(Boolean).forEach(it => {
-    const div = document.createElement('div');
-    div.className = 'hac-card';
-    div.style.cssText = 'background:var(--amber-light);border-radius:8px;padding:.75rem 1rem;text-align:center';
-    div.innerHTML = `
+  const cards = [
+    precioEngorde ? {
+      label: '🐄 Hacienda Engorde',
+      valor: `$${fmtNum(Math.round(precioEngorde))}/kg`,
+      sub:   'Novillito/Novillo · Liniers',
+    } : null,
+    precioRecriar ? {
+      label: '🐂 Hacienda Recría',
+      valor: `$${fmtNum(Math.round(precioRecriar))}/kg`,
+      sub:   'Ternero invernada',
+    } : null,
+  ].filter(Boolean);
+
+  if (!cards.length) {
+    hGrid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⚠️ No se pudieron cargar precios de hacienda.</div>`;
+    return;
+  }
+
+  hGrid.innerHTML = cards.map(it => `
+    <div style="background:var(--amber-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
       <div style="font-size:.72rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
       <div style="font-size:1.15rem;font-weight:800;color:#92400e">${it.valor}</div>
-      <div style="font-size:.68rem;color:#b45309">${it.sub}</div>`;
-    grid.insertBefore(div, lastDiv);
-  });
+      <div style="font-size:.68rem;color:#b45309">${it.sub}</div>
+    </div>
+  `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 deCampoaCampo · Mercado Liniers<br>🕐 ${hora}</div>`;
 
   actualizarValorizacion();
 }
