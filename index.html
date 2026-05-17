@@ -434,6 +434,12 @@
       <div id="hacienda-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
         <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando precios hacienda…</div>
       </div>
+
+      <!-- Fletes de hacienda ($/kg) -->
+      <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.75rem">
+        <div style="font-size:.75rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem">🚛 Flete estimado ($/kg) — se resta del precio Liniers</div>
+        <div id="fletes-hacienda-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem"></div>
+      </div>
     </div>
 
   </div>
@@ -2602,6 +2608,26 @@ function renderFletesGrid() {
   `).join('');
 }
 
+function renderFletesHaciendaGrid() {
+  const grid = document.getElementById('fletes-hacienda-grid');
+  if (!grid) return;
+  const fletes = getFletes();
+  grid.innerHTML = HACIENDA.map(p => `
+    <div style="display:flex;flex-direction:column;gap:.2rem">
+      <label style="font-size:.72rem;font-weight:600;color:#4b5563">${ICONOS[p]||''} ${p}</label>
+      <div style="display:flex;align-items:center;gap:.3rem">
+        <span style="font-size:.8rem;color:var(--gray)">$</span>
+        <input type="number" min="0" step="any" value="${fletes[p]||''}"
+          placeholder="0"
+          style="width:100%;padding:.35rem .5rem;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem;background:var(--gray-light)"
+          onchange="setFlete('${p}', this.value)"
+          oninput="setFlete('${p}', this.value)" />
+        <span style="font-size:.72rem;color:var(--gray);white-space:nowrap">/kg</span>
+      </div>
+    </div>
+  `).join('');
+}
+
 // Parsea precio argentino: "460.000,00" → 460000
 function parsePrecioAR(txt) {
   return parseFloat((txt || '').replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
@@ -2757,22 +2783,28 @@ function actualizarValorizacion() {
     );
   });
 
-  // Hacienda: valorizar si tiene peso prom cargado (cabezas × kg/cab × $/kg)
+  // Hacienda: valorizar si tiene peso prom cargado (cabezas × kg/cab × ($/kg − flete))
   HACIENDA.forEach(p => {
     const cant = stock[p] || 0;
     if (cant <= 0 || !preciosCot[p]) return;
     const precio = preciosCot[p].ars;
     const fuente = preciosCot[p].fuente || 'Liniers';
+    const flete  = fletes[p] || 0;
+    const neto   = Math.max(precio - flete, 0);
     const avgKg  = calcPesoPromHacienda(p);
     if (avgKg) {
-      const valorARS = cant * avgKg * precio;
+      const valorARS = cant * avgKg * neto;
       totalARS += valorARS;
       detalles.push(
-        `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cab. × ${fmtNum(Math.round(avgKg))} kg/cab × $${fmtNum(Math.round(precio))}/kg (${fuente}) = <strong>$${fmtNum(Math.round(valorARS))}</strong>`
+        `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cab. × ${fmtNum(Math.round(avgKg))} kg/cab × $${fmtNum(Math.round(neto))}/kg` +
+        (flete > 0 ? ` <span style="color:var(--gray)">(Liniers $${fmtNum(Math.round(precio))} − flete $${fmtNum(flete)})</span>` : ` (${fuente})`) +
+        ` = <strong>$${fmtNum(Math.round(valorARS))}</strong>`
       );
     } else {
       detalles.push(
-        `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cab. · $${fmtNum(Math.round(precio))}/kg (${fuente}) — <span style="color:var(--gray)">cargá el peso prom. al registrar ingreso para valorizar</span>`
+        `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cab. · $${fmtNum(Math.round(neto))}/kg` +
+        (flete > 0 ? ` <span style="color:var(--gray)">(−$${fmtNum(flete)} flete)</span>` : ` (${fuente})`) +
+        ` — <span style="color:var(--gray)">cargá el peso prom. al registrar ingreso para valorizar</span>`
       );
     }
   });
@@ -2784,6 +2816,7 @@ function actualizarValorizacion() {
 
   renderDashStockCards();
   renderFletesGrid();
+  renderFletesHaciendaGrid();
 }
 
 function renderDashStockCards() {
@@ -2812,9 +2845,9 @@ function renderDashStockCards() {
     const precio     = preciosCot[p]?.ars || null;
     const fuente     = preciosCot[p]?.fuente || '';
 
-    // Granos: precio neto = pizarra − flete
-    const flete   = !esHacienda ? (fletes[p] || 0) : 0;
-    const neto    = !esHacienda && precio ? Math.max(precio - flete, 0) : null;
+    // Granos y hacienda: precio neto = precio fuente − flete
+    const flete   = fletes[p] || 0;
+    const neto    = precio ? Math.max(precio - flete, 0) : null;
 
     // Hacienda: peso prom. ponderado de ingresos
     const avgKg   = esHacienda ? calcPesoPromHacienda(p) : null;
@@ -2822,13 +2855,13 @@ function renderDashStockCards() {
     // Valorización
     const valorizado = !esHacienda && neto
       ? cantidad * neto
-      : (esHacienda && precio && avgKg)
-        ? cantidad * avgKg * precio
+      : (esHacienda && neto && avgKg)
+        ? cantidad * avgKg * neto
         : null;
 
     const precioLabel = esHacienda
-      ? (precio ? `$${fmtNum(Math.round(precio))}/kg` + (fuente ? ` · ${fuente}` : '') : '—')
-      : (neto   ? `$${fmtNum(Math.round(neto))}/tn` + (flete > 0 ? ` <small style="color:var(--gray);font-size:.65rem">(−$${fmtNum(flete)} flete)</small>` : '') : '—');
+      ? (neto ? `$${fmtNum(Math.round(neto))}/kg` + (flete > 0 ? ` <small style="color:var(--gray);font-size:.65rem">(−$${fmtNum(flete)} flete)</small>` : (fuente ? ` · ${fuente}` : '')) : '—')
+      : (neto ? `$${fmtNum(Math.round(neto))}/tn` + (flete > 0 ? ` <small style="color:var(--gray);font-size:.65rem">(−$${fmtNum(flete)} flete)</small>` : '') : '—');
 
     const kgRow = esHacienda ? `
         <div style="display:flex;justify-content:space-between;align-items:center">
