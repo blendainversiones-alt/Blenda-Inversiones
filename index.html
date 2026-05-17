@@ -2263,53 +2263,117 @@ function renderFletesGrid() {
   `).join('');
 }
 
+// Parsea precio argentino: "460.000,00" → 460000
+function parsePrecioAR(txt) {
+  return parseFloat((txt || '').replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
+}
+
 async function cargarCotizaciones() {
   const grid = document.getElementById('cotizaciones-grid');
   if (!grid) return;
+  grid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⏳ Cargando precios pizarra…</div>`;
 
+  // ── Intentar BCR (Cámara Arbitral de Cereales de Rosario) ──
   try {
-    // 1. Tipo de cambio
+    const resBCR = await fetch('https://api.codetabs.com/v1/proxy/?quest=https://www.cac.bcr.com.ar/es/precios-de-pizarra');
+    if (!resBCR.ok) throw new Error('BCR no disponible');
+    const html = await resBCR.text();
+    const doc  = new DOMParser().parseFromString(html, 'text/html');
+
+    const precios = {};
+    doc.querySelectorAll('.board').forEach(board => {
+      const h3  = board.querySelector('h3');
+      const priceEl = board.querySelector('.price');
+      if (!h3 || !priceEl) return;
+      const nombre = h3.textContent.trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');   // quita tildes
+      const ars = parsePrecioAR(priceEl.textContent);
+      if (!ars) return;
+      if (nombre.includes('soja'))              precios['Soja']  = ars;
+      else if (nombre.includes('maiz') || nombre.includes('maíz')) precios['Maíz']  = ars;
+      else if (nombre.includes('trigo'))         precios['Trigo'] = ars;
+    });
+
+    if (!Object.keys(precios).length) throw new Error('Sin precios parseados');
+
+    // Tipo de cambio (para mostrar referencia USD)
+    let usdARS = null;
+    try {
+      const r = await fetch('https://dolarapi.com/v1/dolares/oficial');
+      const d = await r.json();
+      usdARS = d.venta || null;
+    } catch(e) {}
+
+    // Guardar para valorización
+    preciosCot = {};
+    Object.entries(precios).forEach(([k, ars]) => {
+      preciosCot[k] = { ars, usd: usdARS ? ars / usdARS : null, label: k };
+    });
+
+    // Render
+    const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    const cards = [
+      ...(usdARS ? [{ label:'💵 Dólar oficial', valor:`$${fmtNum(Math.round(usdARS))}`, sub:'BNA · por USD' }] : []),
+      ...Object.entries(precios).map(([k, ars]) => ({
+        label: `${ICONOS[k]||''} ${k}`,
+        valor: `$${fmtNum(Math.round(ars))}/tn`,
+        sub:   usdARS ? `≈ USD ${fmtNum(Math.round(ars/usdARS))} · Pizarra Rosario` : 'Pizarra Rosario · BCR',
+      })),
+    ];
+
+    grid.innerHTML = cards.map(it => `
+      <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
+        <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
+        <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
+        <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
+      </div>
+    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 Fuente: Pizarra Rosario BCR · dolarapi.com<br>🕐 ${hora}</div>`;
+
+    actualizarValorizacion();
+    return; // éxito — salir
+
+  } catch(eBCR) {
+    console.warn('BCR falló, usando Yahoo Finance como respaldo:', eBCR.message);
+  }
+
+  // ── Fallback: Yahoo Finance (CBOT) ──
+  try {
     const resDolar = await fetch('https://dolarapi.com/v1/dolares/oficial');
     const dolarData = await resDolar.json();
     const usdARS = dolarData.venta || 1;
 
-    // 2. Precios de granos en USD/bushel desde Yahoo Finance (proxy público)
     const granos = [
-      { key: 'Soja',  ticker: 'ZS=F', bushelsPerTon: 36.7437, label: 'Soja' },
-      { key: 'Maíz',  ticker: 'ZC=F', bushelsPerTon: 39.3683, label: 'Maíz' },
-      { key: 'Trigo', ticker: 'ZW=F', bushelsPerTon: 36.7437, label: 'Trigo' },
+      { key:'Soja',  ticker:'ZS=F', bpt:36.7437 },
+      { key:'Maíz',  ticker:'ZC=F', bpt:39.3683 },
+      { key:'Trigo', ticker:'ZW=F', bpt:36.7437 },
     ];
-
     const precios = {};
     await Promise.all(granos.map(async g => {
       try {
         const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`);
         const d = await r.json();
         const pUSD = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        if (pUSD) precios[g.key] = { usd: (pUSD / g.bushelsPerTon), ars: (pUSD / g.bushelsPerTon) * usdARS, label: g.label };
+        if (pUSD) precios[g.key] = { usd: pUSD/g.bpt, ars: (pUSD/g.bpt)*usdARS, label: g.key };
       } catch(e) {}
     }));
 
-    // 3. Render cotizaciones
+    preciosCot = precios;
+    const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
     const items = [
-      { label: '💵 Dólar oficial', valor: `$${fmtNum(usdARS)}`, sub: 'por USD' },
+      { label:'💵 Dólar oficial', valor:`$${fmtNum(Math.round(usdARS))}`, sub:'por USD' },
       ...Object.values(precios).map(p => ({
         label: `${ICONOS[p.label]||''} ${p.label}`,
-        valor: `$${fmtNum(Math.round(p.ars))}`,
-        sub: `${fmtNum(Math.round(p.usd))} USD/tn · CBOT`,
+        valor: `$${fmtNum(Math.round(p.ars))}/tn`,
+        sub:   `≈ USD ${fmtNum(Math.round(p.usd))} · CBOT`,
       })),
     ];
-
     grid.innerHTML = items.map(it => `
       <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
         <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
         <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
         <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
       </div>
-    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">Fuentes: dolarapi.com · Yahoo Finance (CBOT)<br>Actualizado: ${new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</div>`;
-
-    // 4. Guardar precios para valorización
-    preciosCot = precios;
+    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">⚠️ Respaldo CBOT · 🕐 ${hora}</div>`;
     actualizarValorizacion();
 
   } catch(e) {
