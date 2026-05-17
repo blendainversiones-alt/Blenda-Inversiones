@@ -610,6 +610,10 @@
             <label for="i-unidad">Unidad</label>
             <input id="i-unidad" type="text" placeholder="ej: toneladas, cabezas, kg" />
           </div>
+          <div class="form-group" id="grp-peso-prom" style="display:none">
+            <label for="i-peso-prom">Peso promedio (kg/cabeza)</label>
+            <input id="i-peso-prom" type="number" min="0" step="any" placeholder="Ej: 420" />
+          </div>
           <div class="form-group">
             <label for="i-origen">Campo / Lote *</label>
             <input id="i-origen" type="text" placeholder="Ej: Campo Norte, Lote 3" list="lista-campos" required />
@@ -658,6 +662,7 @@
               <th>Producto</th>
               <th>Cantidad</th>
               <th>Unidad</th>
+              <th>Kg/cab</th>
               <th>Campo / Lote</th>
               <th>Proveedor</th>
               <th>Notas</th>
@@ -1405,6 +1410,9 @@ function updateUnidad() {
 function updateUnidadIngreso() {
   const p = document.getElementById('i-producto').value;
   document.getElementById('i-unidad').value = UNIDADES[p] || '';
+  const esHac = HACIENDA.includes(p);
+  document.getElementById('grp-peso-prom').style.display = esHac ? '' : 'none';
+  if (!esHac) document.getElementById('i-peso-prom').value = '';
 }
 
 document.getElementById('form-salida').addEventListener('submit', e => {
@@ -1569,15 +1577,18 @@ document.getElementById('i-tipo-ingreso').addEventListener('change', function() 
 
 document.getElementById('form-ingreso').addEventListener('submit', e => {
   e.preventDefault();
+  const prod     = document.getElementById('i-producto').value;
+  const pesoProm = HACIENDA.includes(prod) ? (parseFloat(document.getElementById('i-peso-prom').value) || 0) : 0;
   const rec = {
     fecha:        document.getElementById('i-fecha').value,
     tipoIngreso:  document.getElementById('i-tipo-ingreso').value,
     proveedor:    document.getElementById('i-proveedor').value.trim(),
-    producto:     document.getElementById('i-producto').value,
+    producto:     prod,
     cantidad:     parseFloat(document.getElementById('i-cantidad').value) || 0,
     unidad:       document.getElementById('i-unidad').value.trim(),
     origen:       document.getElementById('i-origen').value.trim(),
     notas:        document.getElementById('i-notas').value.trim(),
+    ...(pesoProm > 0 && { pesoProm }),
     creadoEn:     firebase.firestore.FieldValue.serverTimestamp(),
   };
   COL.ingresos().add(rec).then(() => {
@@ -1590,6 +1601,7 @@ function resetIngreso() {
   document.getElementById('form-ingreso').reset();
   document.getElementById('i-fecha').value = todayISO();
   document.getElementById('grp-proveedor').style.display = 'none';
+  document.getElementById('grp-peso-prom').style.display = 'none';
 }
 
 function renderStock() {
@@ -1670,7 +1682,7 @@ function renderMovimientos() {
   const tbody = document.getElementById('tabla-movimientos');
   if (!tbody) return;
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="empty-msg">No hay ingresos que coincidan.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-msg">No hay ingresos que coincidan.</td></tr>`;
     return;
   }
 
@@ -1687,6 +1699,7 @@ function renderMovimientos() {
       <td>${ICONOS[r.producto]||''} ${esc(r.producto)}</td>
       <td style="font-weight:600">+${fmtNum(r.cantidad)}</td>
       <td>${esc(r.unidad||'')}</td>
+      <td style="color:var(--gray);font-size:.82rem">${r.pesoProm ? fmtNum(r.pesoProm)+' kg' : '—'}</td>
       <td>${r.origen ? `<span class="badge b-green">📍 ${esc(r.origen)}</span>` : '—'}</td>
       <td>${esc(r.proveedor||'—')}</td>
       <td style="color:var(--gray);font-size:.82rem">${esc(r.notas||'—')}</td>
@@ -2394,6 +2407,18 @@ async function cargarCotizaciones() {
 const GRANOS = ['Maíz','Soja','Trigo'];
 const HACIENDA = ['Hacienda Engorde','Hacienda Recría'];
 
+// Promedio ponderado de kg/cabeza para hacienda (usa los ingresos que tienen pesoProm cargado)
+function calcPesoPromHacienda(producto) {
+  let sumKg = 0, sumCant = 0;
+  ingresos.forEach(i => {
+    if (i.producto !== producto) return;
+    const cant = parseFloat(i.cantidad) || 0;
+    const peso = parseFloat(i.pesoProm) || 0;
+    if (cant > 0 && peso > 0) { sumKg += cant * peso; sumCant += cant; }
+  });
+  return sumCant > 0 ? sumKg / sumCant : null;
+}
+
 function actualizarValorizacion() {
   const stock  = calcStock();
   const fletes = getFletes();
@@ -2416,15 +2441,24 @@ function actualizarValorizacion() {
     );
   });
 
-  // Hacienda: solo referencia $/kg, no suma al total de granos
+  // Hacienda: valorizar si tiene peso prom cargado (cabezas × kg/cab × $/kg)
   HACIENDA.forEach(p => {
     const cant = stock[p] || 0;
     if (cant <= 0 || !preciosCot[p]) return;
     const precio = preciosCot[p].ars;
     const fuente = preciosCot[p].fuente || 'Liniers';
-    detalles.push(
-      `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cabezas · ref. $${fmtNum(Math.round(precio))}/kg (${fuente}) — <span style="color:var(--gray)">sin valorización automática</span>`
-    );
+    const avgKg  = calcPesoPromHacienda(p);
+    if (avgKg) {
+      const valorARS = cant * avgKg * precio;
+      totalARS += valorARS;
+      detalles.push(
+        `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cab. × ${fmtNum(Math.round(avgKg))} kg/cab × $${fmtNum(Math.round(precio))}/kg (${fuente}) = <strong>$${fmtNum(Math.round(valorARS))}</strong>`
+      );
+    } else {
+      detalles.push(
+        `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} cab. · $${fmtNum(Math.round(precio))}/kg (${fuente}) — <span style="color:var(--gray)">cargá el peso prom. al registrar ingreso para valorizar</span>`
+      );
+    }
   });
 
   const elTotal   = document.getElementById('valor-total-stock');
@@ -2456,22 +2490,43 @@ function renderDashStockCards() {
     : '';
 
   el.innerHTML = aviso + lista.map(p => {
-    const cantidad  = stock[p] ?? 0;
-    const negativo  = cantidad < 0;
+    const cantidad   = stock[p] ?? 0;
+    const negativo   = cantidad < 0;
     const esHacienda = HACIENDA.includes(p);
-    const precio    = preciosCot[p]?.ars || null;
-    const fuente    = preciosCot[p]?.fuente || '';
+    const precio     = preciosCot[p]?.ars || null;
+    const fuente     = preciosCot[p]?.fuente || '';
 
-    // Granos: precio neto = pizarra − flete, se valoriza en $/tn
-    const flete     = !esHacienda ? (fletes[p] || 0) : 0;
-    const neto      = !esHacienda && precio ? Math.max(precio - flete, 0) : null;
-    const valorizado = neto ? cantidad * neto : null;
+    // Granos: precio neto = pizarra − flete
+    const flete   = !esHacienda ? (fletes[p] || 0) : 0;
+    const neto    = !esHacienda && precio ? Math.max(precio - flete, 0) : null;
+
+    // Hacienda: peso prom. ponderado de ingresos
+    const avgKg   = esHacienda ? calcPesoPromHacienda(p) : null;
+
+    // Valorización
+    const valorizado = !esHacienda && neto
+      ? cantidad * neto
+      : (esHacienda && precio && avgKg)
+        ? cantidad * avgKg * precio
+        : null;
 
     const precioLabel = esHacienda
       ? (precio ? `$${fmtNum(Math.round(precio))}/kg` + (fuente ? ` · ${fuente}` : '') : '—')
       : (neto   ? `$${fmtNum(Math.round(neto))}/tn` + (flete > 0 ? ` <small style="color:var(--gray);font-size:.65rem">(−$${fmtNum(flete)} flete)</small>` : '') : '—');
 
-    const precioRowLabel = esHacienda ? 'Ref. precio' : 'Precio neto';
+    const kgRow = esHacienda ? `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--gray)">Peso prom.</span>
+          <span style="font-weight:600;font-size:.88rem;color:#374151">
+            ${avgKg ? fmtNum(Math.round(avgKg)) + ' kg/cab' : '<span style="font-size:.7rem;color:#9ca3af">— cargá al ingresar</span>'}
+          </span>
+        </div>` : '';
+
+    const valLabel = valorizado
+      ? '$' + fmtNum(Math.round(valorizado))
+      : esHacienda
+        ? `<span style="font-size:.7rem;color:#9ca3af">${avgKg ? '' : 'cargá peso prom.'}</span>`
+        : '—';
 
     return `
     <div class="stock-item">
@@ -2484,15 +2539,14 @@ function renderDashStockCards() {
             ${fmtNum(cantidad)} <small style="font-weight:400;font-size:.7rem">${UNIDADES[p]||''}</small>
           </span>
         </div>
+        ${kgRow}
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.72rem;color:var(--gray)">${precioRowLabel}</span>
+          <span style="font-size:.72rem;color:var(--gray)">${esHacienda ? 'Precio ref.' : 'Precio neto'}</span>
           <span style="font-weight:600;font-size:.88rem;color:#374151">${precioLabel}</span>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:.3rem;margin-top:.1rem">
           <span style="font-size:.72rem;font-weight:700;color:var(--gray)">Valorizado</span>
-          <span style="font-weight:800;font-size:.95rem;color:${valorizado ? 'var(--green-dark)' : '#9ca3af'}">
-            ${valorizado ? '$'+fmtNum(Math.round(valorizado)) : esHacienda ? '<span style="font-size:.7rem;color:#9ca3af">ver precio/kg</span>' : '—'}
-          </span>
+          <span style="font-weight:800;font-size:.95rem;color:${valorizado ? 'var(--green-dark)' : '#9ca3af'}">${valLabel}</span>
         </div>
       </div>
       ${negativo ? '<span class="si-alert">⚠️ Stock negativo</span>' : ''}
