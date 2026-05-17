@@ -2813,18 +2813,25 @@ async function fetchHacienda(path) {
   const base = 'https://www.decampoacampo.com/gh_funciones.php';
   const url  = base + path;
   const proxies = [
-    url,                                                                         // directo
-    `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,      // codetabs
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,            // allorigins
+    `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://proxy.cors.sh/${url}`,
   ];
   for (const u of proxies) {
     try {
-      const r = await fetch(u);
-      if (!r.ok) continue;
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch(u, { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!r.ok) { console.warn('[hacienda]', path, 'proxy fail:', u.slice(0,40), r.status); continue; }
       const txt = await r.text();
+      if (!txt || txt.trim()[0] !== '{') { console.warn('[hacienda]', path, 'respuesta no es JSON desde', u.slice(0,40)); continue; }
       const j = JSON.parse(txt);
-      if (j) return j;
-    } catch(e) { /* siguiente proxy */ }
+      if (j && (j.data || j.categorias)) return j;
+    } catch(e) {
+      console.warn('[hacienda]', path, 'error proxy:', u.slice(0,40), e.message);
+    }
   }
   return null;
 }
@@ -2842,12 +2849,14 @@ async function cargarPreciosHacienda() {
   if (!hGrid) return;
   hGrid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⏳ Cargando precios hacienda…</div>`;
 
-  // Fetch en paralelo: gordo + invernada machos (p=1) + invernada hembras (p=2)
-  const [gordo, invMachos, invHembras] = await Promise.all([
-    fetchHacienda('?function=getListadoPreciosGordo'),
-    fetchHacienda('?function=getListadoPreciosInvernada&p=1&m=pesos'),
-    fetchHacienda('?function=getListadoPreciosInvernada&p=2&m=pesos'),
-  ]);
+  // Fetch SECUENCIAL para no saturar proxies (Promise.all en paralelo causaba rate-limit)
+  const gordo      = await fetchHacienda('?function=getListadoPreciosGordo');
+  const invMachos  = await fetchHacienda('?function=getListadoPreciosInvernada&p=1&m=pesos');
+  const invHembras = await fetchHacienda('?function=getListadoPreciosInvernada&p=2&m=pesos');
+
+  console.log('[hacienda] gordo   :', gordo?.data?.length ?? 'NULL');
+  console.log('[hacienda] machos  :', invMachos?.data?.length ?? 'NULL');
+  console.log('[hacienda] hembras :', invHembras?.data?.length ?? 'NULL');
 
   // ── Hacienda Engorde: novillitos + novillos del mercado gordo ──
   const catEngorde = (gordo?.data || []).filter(c => /novillit|novillo/i.test(nombreItem(c)));
@@ -2863,6 +2872,8 @@ async function cargarPreciosHacienda() {
   const precioRecriar = todasRecriar.length
     ? Math.round(todasRecriar.reduce((s, c) => s + precioItem(c), 0) / todasRecriar.length)
     : null;
+
+  console.log('[hacienda] precioEngorde:', precioEngorde, '· precioRecriar:', precioRecriar);
 
   // Guardar en preciosCot
   if (precioEngorde) preciosCot['Hacienda Engorde'] = { ars: precioEngorde, fuente: 'Liniers' };
