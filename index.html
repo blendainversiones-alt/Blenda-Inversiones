@@ -405,17 +405,35 @@
       <div class="stock-grid" id="dash-stock"></div>
     </div>
 
-    <!-- Granos: Cotizaciones + Flete + Valorización -->
+    <!-- Precios del día: Granos + Hacienda + Fletes + Valorización -->
     <div class="card">
-      <h2>🌾 Granos — Precios del día</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem">
+        <h2 style="margin:0">💰 Precios del día</h2>
+        <button class="btn btn-blue btn-sm" id="btn-actualizar-precios" onclick="actualizarPrecios()">🔄 Actualizar</button>
+      </div>
+
+      <!-- Granos -->
+      <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-top:1rem;margin-bottom:.5rem">🌾 Granos — Pizarra Rosario</div>
       <div id="cotizaciones-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
         <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando cotizaciones…</div>
       </div>
 
-      <!-- Fletes configurables -->
+      <!-- Hacienda -->
+      <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-top:1.25rem;margin-bottom:.5rem">🐄 Hacienda — Liniers</div>
+      <div id="hacienda-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
+        <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando precios hacienda…</div>
+      </div>
+
+      <!-- Fletes granos -->
       <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.75rem">
-        <div style="font-size:.75rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem">🚛 Flete estimado ($/tn) — se resta del precio pizarra</div>
+        <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem">🚛 Flete granos ($/tn) — se resta del precio pizarra</div>
         <div id="fletes-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem"></div>
+      </div>
+
+      <!-- Fletes hacienda -->
+      <div style="margin-top:.85rem">
+        <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem">🚛 Flete hacienda ($/kg) — se resta del precio Liniers</div>
+        <div id="fletes-hacienda-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem"></div>
       </div>
 
       <!-- Valorización neta -->
@@ -425,20 +443,6 @@
           <span id="valor-total-stock" style="font-size:1rem;font-weight:800;color:var(--green-dark)">—</span>
         </div>
         <div id="valor-detalle-stock" style="margin-top:.5rem;font-size:.8rem;color:#4b5563"></div>
-      </div>
-    </div>
-
-    <!-- Hacienda: Precios Liniers -->
-    <div class="card">
-      <h2>🐄 Hacienda — Precios Liniers</h2>
-      <div id="hacienda-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
-        <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando precios hacienda…</div>
-      </div>
-
-      <!-- Fletes de hacienda ($/kg) -->
-      <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.75rem">
-        <div style="font-size:.75rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem">🚛 Flete estimado ($/kg) — se resta del precio Liniers</div>
-        <div id="fletes-hacienda-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem"></div>
       </div>
     </div>
 
@@ -3010,6 +3014,26 @@ async function iniciarCotizaciones() {
 }
 iniciarCotizaciones();
 setInterval(iniciarCotizaciones, 15 * 60 * 1000);
+
+// Botón "Actualizar precios" — recarga manual con feedback
+async function actualizarPrecios() {
+  const btn = document.getElementById('btn-actualizar-precios');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Actualizando…';
+  }
+  try {
+    await iniciarCotizaciones();
+    toast('🔄 Precios actualizados', '#14532d');
+  } catch(e) {
+    toast('⚠️ Error al actualizar precios');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔄 Actualizar';
+    }
+  }
+}
 
 // ── Boot: los listeners de Firestore arrancan solos y llaman renderAll() cuando cargan ──
 </script>
