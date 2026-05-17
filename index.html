@@ -402,9 +402,17 @@
       <div id="cotizaciones-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem">
         <div style="text-align:center;color:var(--gray);padding:1rem;font-size:.85rem">Cargando cotizaciones…</div>
       </div>
+
+      <!-- Fletes configurables -->
+      <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.75rem">
+        <div style="font-size:.75rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-bottom:.6rem">🚛 Flete estimado ($/tn) — se resta del precio pizarra</div>
+        <div id="fletes-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem"></div>
+      </div>
+
+      <!-- Valorización neta -->
       <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:.75rem">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-          <span style="font-size:.8rem;font-weight:700;color:var(--gray)">💰 VALORIZACIÓN DEL STOCK</span>
+          <span style="font-size:.8rem;font-weight:700;color:var(--gray)">💰 VALORIZACIÓN NETA DEL STOCK</span>
           <span id="valor-total-stock" style="font-size:1rem;font-weight:800;color:var(--green-dark)">—</span>
         </div>
         <div id="valor-detalle-stock" style="margin-top:.5rem;font-size:.8rem;color:#4b5563"></div>
@@ -1286,55 +1294,8 @@ function renderDashboard() {
     </div>
   `;
 
-  // Stock cards con detalle ingresado / salido / restante
-  const sinStock = ingresos.length === 0 && salidas.length > 0;
-
-  // Calcular totales por producto
-  const totIngresado = {}, totSalido = {};
-  PRODUCTOS.forEach(p => { totIngresado[p] = 0; totSalido[p] = 0; });
-  ingresos.forEach(i => { totIngresado[i.producto] = (totIngresado[i.producto]||0) + (parseFloat(i.cantidad)||0); });
-  salidas.forEach(s  => { totSalido[s.producto]   = (totSalido[s.producto]||0)   + (parseFloat(s.cantidad)||0); });
-
-  const aviso = sinStock
-    ? `<div class="alert-banner" style="margin-bottom:1rem;grid-column:1/-1">📥 Para ver el stock, primero cargá la cosecha en <strong>📦 Stock → Cargar ingreso</strong>.</div>`
-    : '';
-
-  const productosConMov = PRODUCTOS.filter(p => totIngresado[p] > 0 || totSalido[p] > 0);
-  const listaProductos  = productosConMov.length > 0 ? productosConMov : PRODUCTOS;
-
-  const items = listaProductos.map(p => {
-    const cantidad  = stock[p] ?? 0;
-    const precio    = preciosCot[p]?.ars || null;
-    const valorizado = precio ? cantidad * precio : null;
-    const negativo  = cantidad < 0;
-
-    return `
-    <div class="stock-item">
-      <span class="si-icon">${ICONOS[p]}</span>
-      <span class="si-name">${p}</span>
-      <div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.3rem">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.72rem;color:var(--gray)">Cantidad</span>
-          <span style="font-weight:800;font-size:1rem;color:${negativo?'var(--red)':'var(--gray-dark)'}">
-            ${fmtNum(cantidad)} <small style="font-weight:400;font-size:.7rem">${UNIDADES[p]||''}</small>
-          </span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:.72rem;color:var(--gray)">Precio pizarra</span>
-          <span style="font-weight:600;font-size:.88rem;color:#374151">${precio ? '$'+fmtNum(Math.round(precio))+'/tn' : '—'}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:.3rem;margin-top:.1rem">
-          <span style="font-size:.72rem;font-weight:700;color:var(--gray)">Valorizado</span>
-          <span style="font-weight:800;font-size:.95rem;color:${valorizado ? 'var(--green-dark)' : '#9ca3af'}">
-            ${valorizado ? '$'+fmtNum(Math.round(valorizado)) : '—'}
-          </span>
-        </div>
-      </div>
-      ${negativo ? '<span class="si-alert">⚠️ Stock negativo</span>' : ''}
-    </div>`;
-  }).join('');
-
-  document.getElementById('dash-stock').innerHTML = aviso + items;
+  // Stock cards con precio neto (pizarra − flete) — renderizado por renderDashStockCards()
+  renderDashStockCards();
 
   // Últimas 8 salidas
   const ultimas = [...salidas].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||'')).slice(0,8);
@@ -2103,6 +2064,39 @@ function deleteIngresoSeguro(id)  { confirmarEliminar(() => COL.ingresos().doc(i
 // ═══════════════════════════════════════════
 
 let preciosCot = {};  // precios por producto en ARS/tn o ARS/cabeza
+const FLETE_KEY = 'blenda_fletes_v1';
+
+function getFletes() {
+  return JSON.parse(localStorage.getItem(FLETE_KEY) || '{}');
+}
+function setFlete(producto, valor) {
+  const f = getFletes();
+  f[producto] = parseFloat(valor) || 0;
+  localStorage.setItem(FLETE_KEY, JSON.stringify(f));
+  actualizarValorizacion();
+  renderDashStockCards();
+}
+
+function renderFletesGrid() {
+  const grid = document.getElementById('fletes-grid');
+  if (!grid) return;
+  const fletes = getFletes();
+  const productosGranos = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría'];
+  grid.innerHTML = productosGranos.map(p => `
+    <div style="display:flex;flex-direction:column;gap:.2rem">
+      <label style="font-size:.72rem;font-weight:600;color:#4b5563">${ICONOS[p]||''} ${p}</label>
+      <div style="display:flex;align-items:center;gap:.3rem">
+        <span style="font-size:.8rem;color:var(--gray)">$</span>
+        <input type="number" min="0" step="any" value="${fletes[p]||''}"
+          placeholder="0"
+          style="width:100%;padding:.35rem .5rem;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem;background:var(--gray-light)"
+          onchange="setFlete('${p}', this.value)"
+          oninput="setFlete('${p}', this.value)" />
+        <span style="font-size:.72rem;color:var(--gray);white-space:nowrap">/tn</span>
+      </div>
+    </div>
+  `).join('');
+}
 
 async function cargarCotizaciones() {
   const grid = document.getElementById('cotizaciones-grid');
@@ -2159,22 +2153,90 @@ async function cargarCotizaciones() {
 }
 
 function actualizarValorizacion() {
-  const stock = calcStock();
+  const stock  = calcStock();
+  const fletes = getFletes();
   let totalARS = 0;
   const detalles = [];
 
   PRODUCTOS.forEach(p => {
     const cant = stock[p] || 0;
     if (cant <= 0 || !preciosCot[p]) return;
-    const valorARS = cant * preciosCot[p].ars;
+    const pizarra  = preciosCot[p].ars;
+    const flete    = fletes[p] || 0;
+    const neto     = Math.max(pizarra - flete, 0);
+    const valorARS = cant * neto;
     totalARS += valorARS;
-    detalles.push(`${ICONOS[p]||''} ${p}: ${fmtNum(cant)} tn × $${fmtNum(Math.round(preciosCot[p].ars))}/tn = <strong>$${fmtNum(Math.round(valorARS))}</strong>`);
+    detalles.push(
+      `${ICONOS[p]||''} ${p}: ${fmtNum(cant)} tn × $${fmtNum(Math.round(neto))}/tn` +
+      (flete > 0 ? ` <span style="color:var(--gray)">(pizarra $${fmtNum(Math.round(pizarra))} − flete $${fmtNum(flete)})</span>` : '') +
+      ` = <strong>$${fmtNum(Math.round(valorARS))}</strong>`
+    );
   });
 
-  const elTotal  = document.getElementById('valor-total-stock');
+  const elTotal   = document.getElementById('valor-total-stock');
   const elDetalle = document.getElementById('valor-detalle-stock');
-  if (elTotal) elTotal.textContent = totalARS > 0 ? `$${fmtNum(Math.round(totalARS))} ARS` : '—';
-  if (elDetalle) elDetalle.innerHTML = detalles.length ? detalles.join(' &nbsp;|&nbsp; ') : '<span style="color:var(--gray)">Cargá stock de granos para ver la valorización.</span>';
+  if (elTotal)   elTotal.textContent  = totalARS > 0 ? `$${fmtNum(Math.round(totalARS))} ARS` : '—';
+  if (elDetalle) elDetalle.innerHTML  = detalles.length ? detalles.join('<br>') : '<span style="color:var(--gray)">Cargá stock de granos para ver la valorización.</span>';
+
+  renderDashStockCards();
+  renderFletesGrid();
+}
+
+function renderDashStockCards() {
+  const stock  = calcStock();
+  const fletes = getFletes();
+  const totIngresado = {}, totSalido = {};
+  PRODUCTOS.forEach(p => { totIngresado[p] = 0; totSalido[p] = 0; });
+  ingresos.forEach(i => { totIngresado[i.producto] = (totIngresado[i.producto]||0) + (parseFloat(i.cantidad)||0); });
+  salidas.forEach(s  => { totSalido[s.producto]    = (totSalido[s.producto]||0)    + (parseFloat(s.cantidad)||0); });
+
+  const productosConMov = PRODUCTOS.filter(p => totIngresado[p] > 0 || totSalido[p] > 0);
+  const lista = productosConMov.length > 0 ? productosConMov : PRODUCTOS;
+
+  const el = document.getElementById('dash-stock');
+  if (!el) return;
+
+  const sinStock = ingresos.length === 0 && salidas.length > 0;
+  const aviso = sinStock
+    ? `<div class="alert-banner" style="margin-bottom:1rem;grid-column:1/-1">📥 Para ver el stock, primero cargá la cosecha en <strong>📦 Stock → Cargar ingreso</strong>.</div>`
+    : '';
+
+  el.innerHTML = aviso + lista.map(p => {
+    const cantidad   = stock[p] ?? 0;
+    const pizarra    = preciosCot[p]?.ars || null;
+    const flete      = fletes[p] || 0;
+    const neto       = pizarra ? Math.max(pizarra - flete, 0) : null;
+    const valorizado = neto ? cantidad * neto : null;
+    const negativo   = cantidad < 0;
+
+    return `
+    <div class="stock-item">
+      <span class="si-icon">${ICONOS[p]}</span>
+      <span class="si-name">${p}</span>
+      <div style="margin-top:.4rem;display:flex;flex-direction:column;gap:.3rem">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--gray)">Cantidad</span>
+          <span style="font-weight:800;font-size:1rem;color:${negativo?'var(--red)':'var(--gray-dark)'}">
+            ${fmtNum(cantidad)} <small style="font-weight:400;font-size:.7rem">${UNIDADES[p]||''}</small>
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:.72rem;color:var(--gray)">Precio neto</span>
+          <span style="font-weight:600;font-size:.88rem;color:#374151">
+            ${neto ? '$'+fmtNum(Math.round(neto))+'/tn' : '—'}
+            ${pizarra && flete > 0 ? `<small style="color:var(--gray);font-size:.65rem"> (−$${fmtNum(flete)} flete)</small>` : ''}
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:.3rem;margin-top:.1rem">
+          <span style="font-size:.72rem;font-weight:700;color:var(--gray)">Valorizado</span>
+          <span style="font-weight:800;font-size:.95rem;color:${valorizado ? 'var(--green-dark)' : '#9ca3af'}">
+            ${valorizado ? '$'+fmtNum(Math.round(valorizado)) : '—'}
+          </span>
+        </div>
+      </div>
+      ${negativo ? '<span class="si-alert">⚠️ Stock negativo</span>' : ''}
+    </div>`;
+  }).join('');
 }
 
 // Cargar cotizaciones al arrancar y cada 15 minutos
