@@ -2500,78 +2500,82 @@ function renderDashStockCards() {
   }).join('');
 }
 
-// ── Precios de hacienda desde deCampoaCampo (Liniers) ──
-async function cargarPreciosHacienda() {
-  // URLs del proxy con parámetros pre-encodados para evitar conflictos
-  const URL_GORDO     = 'https://api.codetabs.com/v1/proxy/?quest=https%3A%2F%2Fwww.decampoacampo.com%2Fgh_funciones.php%3Ffunction%3DgetListadoPreciosGordo';
-  const URL_INVERNADA = 'https://api.codetabs.com/v1/proxy/?quest=https%3A%2F%2Fwww.decampoacampo.com%2Fgh_funciones.php%3Ffunction%3DgetListadoPreciosInvernada%26p%3D1%26m%3Dpesos';
+// ── Precios de hacienda desde deCampoaCampo (Liniers / Invernada) ──
 
-  let gordo = null, invernada = null;
-
-  // Intento 1: fetch directo (funciona si el servidor permite CORS)
-  try {
-    const [rG, rI] = await Promise.all([
-      fetch('https://www.decampoacampo.com/gh_funciones.php?function=getListadoPreciosGordo'),
-      fetch('https://www.decampoacampo.com/gh_funciones.php?function=getListadoPreciosInvernada&p=1&m=pesos'),
-    ]);
-    if (rG.ok && rI.ok) {
-      gordo     = await rG.json();
-      invernada = await rI.json();
-    }
-  } catch(e) { /* CORS bloqueado, usar proxy */ }
-
-  // Intento 2: proxy codetabs con URLs pre-encodadas
-  if (!gordo || !invernada) {
+// Helper: intenta fetch con múltiples proxies hasta que uno funcione
+async function fetchHacienda(path) {
+  const base = 'https://www.decampoacampo.com/gh_funciones.php';
+  const url  = base + path;
+  const proxies = [
+    url,                                                                         // directo
+    `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,      // codetabs
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,            // allorigins
+  ];
+  for (const u of proxies) {
     try {
-      const [rG, rI] = await Promise.all([
-        fetch(URL_GORDO),
-        fetch(URL_INVERNADA),
-      ]);
-      if (rG.ok) gordo     = await rG.json();
-      if (rI.ok) invernada = await rI.json();
-    } catch(e) { console.warn('Hacienda proxy falló:', e.message); }
+      const r = await fetch(u);
+      if (!r.ok) continue;
+      const txt = await r.text();
+      const j = JSON.parse(txt);
+      if (j) return j;
+    } catch(e) { /* siguiente proxy */ }
   }
+  return null;
+}
 
-  if (!gordo && !invernada) return; // sin datos, salir silenciosamente
+// Normaliza un item de categoría (la API usa campos distintos según endpoint)
+function precioItem(c) {
+  return parseFloat(c.precio_semana_1 || c.precio_semana_actual || 0);
+}
+function nombreItem(c) {
+  return (c.categoria || c.nombre || '').toLowerCase();
+}
 
-  // Hacienda Engorde → promedio novillitos + novillos (precio semana 1 = más reciente)
-  const catEngorde = (gordo?.data || []).filter(c => /novillit|novillo/i.test(c.categoria));
-  const precioEngorde = catEngorde.length
-    ? catEngorde.reduce((s, c) => s + (parseFloat(c.precio_semana_1) || 0), 0) / catEngorde.length
-    : null;
-
-  // Hacienda Recría → promedio terneros invernada machos
-  const catRecriar = (invernada?.categorias || []).filter(c => /ternero/i.test(c.nombre));
-  const precioRecriar = catRecriar.length
-    ? catRecriar.reduce((s, c) => s + (parseFloat(c.precio_semana_actual) || 0), 0) / catRecriar.length
-    : null;
-
-  if (precioEngorde) preciosCot['Hacienda Engorde'] = { ars: precioEngorde, label: 'Hacienda Engorde', fuente: 'Liniers' };
-  if (precioRecriar) preciosCot['Hacienda Recría']  = { ars: precioRecriar, label: 'Hacienda Recría',  fuente: 'Invernada' };
-
-  // Render en el div dedicado para hacienda
+async function cargarPreciosHacienda() {
   const hGrid = document.getElementById('hacienda-grid');
   if (!hGrid) return;
+  hGrid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⏳ Cargando precios hacienda…</div>`;
 
+  // Fetch en paralelo: gordo + invernada machos (p=1) + invernada hembras (p=2)
+  const [gordo, invMachos, invHembras] = await Promise.all([
+    fetchHacienda('?function=getListadoPreciosGordo'),
+    fetchHacienda('?function=getListadoPreciosInvernada&p=1&m=pesos'),
+    fetchHacienda('?function=getListadoPreciosInvernada&p=2&m=pesos'),
+  ]);
+
+  // ── Hacienda Engorde: novillitos + novillos del mercado gordo ──
+  const catEngorde = (gordo?.data || []).filter(c => /novillit|novillo/i.test(nombreItem(c)));
+  const precioEngorde = catEngorde.length
+    ? Math.round(catEngorde.reduce((s, c) => s + precioItem(c), 0) / catEngorde.length)
+    : null;
+
+  // ── Hacienda Recría: terneros (machos) + terneras (hembras) ──
+  const catTernerosMachos  = (invMachos?.categorias  || []).filter(c => /ternero/i.test(nombreItem(c)));
+  const catTernerasHembras = (invHembras?.categorias || []).filter(c => /ternera/i.test(nombreItem(c)));
+  const todasRecriar = [...catTernerosMachos, ...catTernerasHembras];
+  const precioRecriar = todasRecriar.length
+    ? Math.round(todasRecriar.reduce((s, c) => s + precioItem(c), 0) / todasRecriar.length)
+    : null;
+
+  // Guardar en preciosCot
+  if (precioEngorde) preciosCot['Hacienda Engorde'] = { ars: precioEngorde, fuente: 'Liniers' };
+  if (precioRecriar) preciosCot['Hacienda Recría']  = { ars: precioRecriar, fuente: 'Invernada' };
+
+  // ── Render ──
   const hora = new Date().toLocaleTimeString('es-AR', { hour:'2-digit', minute:'2-digit' });
 
-  const cards = [
-    precioEngorde ? {
-      label: '🐄 Hacienda Engorde',
-      valor: `$${fmtNum(Math.round(precioEngorde))}/kg`,
-      sub:   'Novillito/Novillo · Liniers',
-    } : null,
-    precioRecriar ? {
-      label: '🐂 Hacienda Recría',
-      valor: `$${fmtNum(Math.round(precioRecriar))}/kg`,
-      sub:   'Ternero invernada',
-    } : null,
-  ].filter(Boolean);
-
-  if (!cards.length) {
-    hGrid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⚠️ No se pudieron cargar precios de hacienda.</div>`;
+  if (!precioEngorde && !precioRecriar) {
+    hGrid.innerHTML = `<div style="color:var(--red);font-size:.82rem;padding:.5rem">
+      ⚠️ No se pudieron cargar precios de hacienda.
+      <button class="btn btn-secondary btn-sm" style="margin-left:.5rem" onclick="cargarPreciosHacienda()">Reintentar</button>
+    </div>`;
     return;
   }
+
+  const cards = [
+    precioEngorde ? { label:'🐄 Hacienda Engorde', valor:`$${fmtNum(precioEngorde)}/kg`, sub:'Novillito/Novillo · Liniers' } : null,
+    precioRecriar ? { label:'🐂 Hacienda Recría',  valor:`$${fmtNum(precioRecriar)}/kg`,  sub:'Ternero/a · Invernada'       } : null,
+  ].filter(Boolean);
 
   hGrid.innerHTML = cards.map(it => `
     <div style="background:var(--amber-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
@@ -2579,7 +2583,7 @@ async function cargarPreciosHacienda() {
       <div style="font-size:1.15rem;font-weight:800;color:#92400e">${it.valor}</div>
       <div style="font-size:.68rem;color:#b45309">${it.sub}</div>
     </div>
-  `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 deCampoaCampo · Mercado Liniers<br>🕐 ${hora}</div>`;
+  `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 deCampoaCampo · Liniers<br>🕐 ${hora}</div>`;
 
   actualizarValorizacion();
 }
