@@ -2603,9 +2603,10 @@ async function cargarPreciosHacienda() {
     ? Math.round(catEngorde.reduce((s, c) => s + precioItem(c), 0) / catEngorde.length)
     : null;
 
-  // ── Hacienda Recría: terneros (machos) + terneras (hembras) ──
-  const catTernerosMachos  = (invMachos?.categorias  || []).filter(c => /ternero/i.test(nombreItem(c)));
-  const catTernerasHembras = (invHembras?.categorias || []).filter(c => /ternera/i.test(nombreItem(c)));
+  // ── Hacienda Recría: terneros (machos, p=1) + terneras (hembras, p=2) ──
+  // Ambos endpoints devuelven array en "data" (no "categorias")
+  const catTernerosMachos  = (invMachos?.data  || []).filter(c => /ternero/i.test(nombreItem(c)));
+  const catTernerasHembras = (invHembras?.data || []).filter(c => /ternera/i.test(nombreItem(c)));
   const todasRecriar = [...catTernerosMachos, ...catTernerasHembras];
   const precioRecriar = todasRecriar.length
     ? Math.round(todasRecriar.reduce((s, c) => s + precioItem(c), 0) / todasRecriar.length)
