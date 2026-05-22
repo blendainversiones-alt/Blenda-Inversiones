@@ -3,10 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <title>Blenda Hnos — Control de Stock v5</title>
+  <title>Blenda Hnos — Control de Stock</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -392,8 +389,6 @@
   <div class="tab" onclick="showPage('stock', this)">📥 Ingresos</div>
   <div class="tab" onclick="showPage('salidas', this)">📤 Egresos</div>
   <div class="tab" onclick="showPage('resumen', this)">📈 Resumen</div>
-  <div class="tab" onclick="showPage('siembra', this)">🌱 Siembra</div>
-  <div class="tab" onclick="showPage('animales', this)">🐄 Engorde</div>
   <div class="tab" onclick="showPage('tablas', this)">📋 Tablas</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
@@ -742,379 +737,6 @@
             </tr>
           </thead>
           <tbody id="tabla-resumen"></tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ═══════════════════════════════ SIEMBRA ═══════════════════════════════ -->
-<div class="page" id="page-siembra">
-  <div class="container">
-
-    <!-- KPIs -->
-    <div class="card">
-      <h2>🌱 Plan de siembra</h2>
-      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Planificá la campaña por lote: hectáreas, cultivo, rinde estimado y estado.</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-top:.5rem" id="siembra-kpis"></div>
-    </div>
-
-    <!-- Formulario -->
-    <div class="card">
-      <h2>➕ Nuevo plan</h2>
-      <form id="form-siembra">
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="si-campania">Campaña *</label>
-            <input id="si-campania" type="text" placeholder="Ej: 2024/25 — Soja" required />
-          </div>
-          <div class="form-group">
-            <label for="si-cultivo">Cultivo *</label>
-            <select id="si-cultivo" required>
-              <option value="">— Seleccionar —</option>
-              <option value="Maíz">🌽 Maíz</option>
-              <option value="Soja">🌿 Soja</option>
-              <option value="Trigo">🌾 Trigo</option>
-              <option value="Girasol">🌻 Girasol</option>
-              <option value="Sorgo">🌾 Sorgo</option>
-              <option value="Cebada">🌾 Cebada</option>
-              <option value="Otro">📦 Otro</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="si-campo">Campo / Lote *</label>
-            <input id="si-campo" type="text" placeholder="Ej: Campo Norte, Lote 3" list="lista-campos-siembra" required />
-            <datalist id="lista-campos-siembra"></datalist>
-          </div>
-          <div class="form-group">
-            <label for="si-hectareas">Hectáreas *</label>
-            <input id="si-hectareas" type="number" min="0" step="any" placeholder="0" required />
-          </div>
-          <div class="form-group">
-            <label for="si-variedad">Variedad / Híbrido</label>
-            <input id="si-variedad" type="text" placeholder="Ej: DK7220, NK842" />
-          </div>
-          <div class="form-group">
-            <label for="si-rinde">Rinde estimado (tn/ha)</label>
-            <input id="si-rinde" type="number" min="0" step="any" placeholder="Ej: 3.5" />
-          </div>
-          <div class="form-group">
-            <label for="si-fecha-siembra">Fecha siembra</label>
-            <input id="si-fecha-siembra" type="date" />
-          </div>
-          <div class="form-group">
-            <label for="si-fecha-cosecha">Fecha cosecha estimada</label>
-            <input id="si-fecha-cosecha" type="date" />
-          </div>
-          <div class="form-group">
-            <label for="si-estado">Estado</label>
-            <select id="si-estado">
-              <option value="Planificado">📋 Planificado</option>
-              <option value="Sembrado">🌱 Sembrado</option>
-              <option value="En desarrollo">🌾 En desarrollo</option>
-              <option value="Cosechado">✅ Cosechado</option>
-            </select>
-          </div>
-          <div class="form-group" style="grid-column:1/-1">
-            <label for="si-notas">Notas</label>
-            <textarea id="si-notas" placeholder="Tratamientos, observaciones, costos…"></textarea>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" onclick="resetSiembra()">Limpiar</button>
-          <button type="submit" class="btn btn-primary">Guardar plan</button>
-        </div>
-      </form>
-    </div>
-
-    <!-- Listado -->
-    <div class="card">
-      <h2>📋 Planes registrados</h2>
-      <div class="toolbar">
-        <input id="si-search" type="search" placeholder="Buscar campaña, campo, cultivo…" oninput="renderSiembras()" />
-        <select id="si-filter-cultivo" onchange="renderSiembras()" style="width:auto;min-width:140px">
-          <option value="">Todos los cultivos</option>
-          <option value="Maíz">Maíz</option>
-          <option value="Soja">Soja</option>
-          <option value="Trigo">Trigo</option>
-          <option value="Girasol">Girasol</option>
-          <option value="Sorgo">Sorgo</option>
-          <option value="Cebada">Cebada</option>
-          <option value="Otro">Otro</option>
-        </select>
-        <select id="si-filter-estado" onchange="renderSiembras()" style="width:auto;min-width:140px">
-          <option value="">Todos los estados</option>
-          <option value="Planificado">Planificado</option>
-          <option value="Sembrado">Sembrado</option>
-          <option value="En desarrollo">En desarrollo</option>
-          <option value="Cosechado">Cosechado</option>
-        </select>
-        <button class="btn btn-blue btn-sm" onclick="exportSiembrasCSV()">Exportar CSV</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Campaña</th>
-              <th>Cultivo</th>
-              <th>Campo</th>
-              <th>Has</th>
-              <th>Variedad</th>
-              <th>Rinde tn/ha</th>
-              <th>Producción est.</th>
-              <th>Siembra</th>
-              <th>Cosecha est.</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-siembras"></tbody>
-        </table>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- Modal editar siembra -->
-<div class="modal-backdrop" id="modal-siembra">
-  <div class="modal">
-    <h3>✏️ Editar plan de siembra</h3>
-    <form id="form-edit-siembra">
-      <div class="form-grid">
-        <div class="form-group"><label>Campaña *</label><input id="esi-campania" type="text" required /></div>
-        <div class="form-group"><label>Cultivo *</label>
-          <select id="esi-cultivo" required>
-            <option value="Maíz">🌽 Maíz</option>
-            <option value="Soja">🌿 Soja</option>
-            <option value="Trigo">🌾 Trigo</option>
-            <option value="Girasol">🌻 Girasol</option>
-            <option value="Sorgo">🌾 Sorgo</option>
-            <option value="Cebada">🌾 Cebada</option>
-            <option value="Otro">📦 Otro</option>
-          </select>
-        </div>
-        <div class="form-group"><label>Campo / Lote *</label><input id="esi-campo" type="text" required /></div>
-        <div class="form-group"><label>Hectáreas *</label><input id="esi-hectareas" type="number" min="0" step="any" required /></div>
-        <div class="form-group"><label>Variedad / Híbrido</label><input id="esi-variedad" type="text" /></div>
-        <div class="form-group"><label>Rinde estimado (tn/ha)</label><input id="esi-rinde" type="number" min="0" step="any" /></div>
-        <div class="form-group"><label>Fecha siembra</label><input id="esi-fecha-siembra" type="date" /></div>
-        <div class="form-group"><label>Fecha cosecha estimada</label><input id="esi-fecha-cosecha" type="date" /></div>
-        <div class="form-group"><label>Estado</label>
-          <select id="esi-estado">
-            <option value="Planificado">📋 Planificado</option>
-            <option value="Sembrado">🌱 Sembrado</option>
-            <option value="En desarrollo">🌾 En desarrollo</option>
-            <option value="Cosechado">✅ Cosechado</option>
-          </select>
-        </div>
-        <div class="form-group" style="grid-column:1/-1"><label>Notas</label><textarea id="esi-notas"></textarea></div>
-      </div>
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-siembra')">Cancelar</button>
-        <button type="submit" class="btn btn-primary">Guardar cambios</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════ ANIMALES ═══════════════════════════════ -->
-<div class="page" id="page-animales">
-  <div class="container">
-
-    <!-- Banner versión -->
-    <div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:.6rem 1rem;border-radius:10px;margin-bottom:1rem;font-size:.85rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-      <span><strong>🆕 NUEVO FLUJO POR JAULA — v6</strong> · Cargá datos del camión una vez, luego escaneás caravanas</span>
-      <span id="ver-fecha" style="font-size:.7rem;opacity:.85"></span>
-    </div>
-    <!-- KPIs -->
-    <div class="card">
-      <h2>🐄 Hacienda Engorde — Registro individual</h2>
-      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargás los datos de la jaula que llega, después escaneás cada caravana con foto.</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem" id="animales-kpis"></div>
-    </div>
-
-    <!-- 1. Datos del lote / jaula -->
-    <div class="card" style="border-left:4px solid var(--green)">
-      <h2>🚚 Datos de la jaula que llega</h2>
-      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargás una sola vez los datos del camión y la mercadería. Después escaneás las caravanas una por una.</p>
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="an-patente-ing">🚛 Patente del camión</label>
-          <input id="an-patente-ing" type="text" placeholder="Ej: AB 123 CD" style="text-transform:uppercase" />
-        </div>
-        <div class="form-group">
-          <label for="an-fecha-ing">📅 Fecha ingreso *</label>
-          <input id="an-fecha-ing" type="date" required />
-        </div>
-        <div class="form-group">
-          <label for="an-cantidad-esp">🔢 Cantidad de animales *</label>
-          <input id="an-cantidad-esp" type="number" min="0" step="1" placeholder="Ej: 50" oninput="actualizarContadorLote()" required />
-        </div>
-        <div class="form-group">
-          <label for="an-peso-ing">⚖️ Peso aproximado (kg/cab) *</label>
-          <input id="an-peso-ing" type="number" min="0" step="any" placeholder="Ej: 380" required />
-        </div>
-        <div class="form-group">
-          <label for="an-campo-ing">📍 Campo / Destino *</label>
-          <input id="an-campo-ing" type="text" placeholder="Ej: Campo Norte" list="lista-campos-an" required />
-          <datalist id="lista-campos-an"></datalist>
-        </div>
-        <div class="form-group">
-          <label for="an-proveedor-ing">🚚 Proveedor (si es compra)</label>
-          <input id="an-proveedor-ing" type="text" placeholder="Nombre del proveedor" list="lista-proveedores-an" />
-          <datalist id="lista-proveedores-an"></datalist>
-        </div>
-        <div class="form-group" style="grid-column:1/-1">
-          <label for="an-notas-ing">📝 Notas del lote</label>
-          <textarea id="an-notas-ing" placeholder="Remito, observaciones generales…"></textarea>
-        </div>
-      </div>
-      <div class="form-actions" style="justify-content:flex-end">
-        <button type="button" class="btn btn-secondary" onclick="reiniciarLote()">🔄 Reiniciar lote</button>
-      </div>
-    </div>
-
-    <!-- 2. Cargar caravanas en cadena -->
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-        <h2 style="margin:0">📷 Escanear caravanas</h2>
-        <span id="contador-lote" style="font-size:1rem;font-weight:800;color:var(--green-dark);background:var(--green-light);padding:.35rem .85rem;border-radius:99px">0 / 0</span>
-      </div>
-      <p style="font-size:.85rem;color:var(--gray);margin:.6rem 0">Sacale foto a la caravana de cada animal. El N° se detecta y se agrega solo. Si está mal, corregís antes de confirmar.</p>
-
-      <input id="an-foto-ing" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'ing')" />
-      <button type="button" class="btn btn-primary" style="font-size:1.05rem;padding:1rem 1.5rem;width:100%" onclick="iniciarCapturaCaravana()">📷 Tomar foto de caravana <small style="opacity:.6">v4</small></button>
-
-      <div id="an-ocr-status-ing" style="font-size:.85rem;color:var(--gray);margin-top:.6rem"></div>
-      <img id="an-preview-ing" style="display:none;width:100%;max-height:280px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
-
-      <!-- Caja de confirmación de caravana detectada -->
-      <div id="confirma-caravana" style="display:none;margin-top:.75rem;background:var(--green-light);border:1.5px solid var(--green);border-radius:10px;padding:.85rem">
-        <div style="font-size:.78rem;color:var(--green-dark);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem">Caravana detectada</div>
-        <input id="an-caravana-ing" type="text" style="font-size:1.25rem;font-weight:800;padding:.65rem;width:100%;text-align:center" placeholder="N° caravana" />
-        <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
-          <button type="button" class="btn btn-primary" style="flex:1;font-size:1rem;padding:.8rem" onclick="confirmarCaravana()">✅ Confirmar y siguiente</button>
-          <button type="button" class="btn btn-secondary" onclick="cancelarCaravana()">Descartar</button>
-        </div>
-      </div>
-
-      <input id="an-categoria-ing" type="hidden" value="Hacienda Engorde" />
-
-      <!-- Lista de caravanas cargadas en el lote actual -->
-      <div id="caravanas-lote-wrap" style="display:none;margin-top:1rem;border-top:1px solid var(--border);padding-top:.8rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-          <span style="font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Cargadas en este lote</span>
-          <button type="button" class="btn btn-danger btn-sm" onclick="borrarUltimaCaravana()">↶ Deshacer última</button>
-        </div>
-        <div id="caravanas-lote-list" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
-      </div>
-    </div>
-
-    <!-- 3. Datos del egreso -->
-    <div class="card" style="border-left:4px solid #7c3aed">
-      <h2>📤 Datos del egreso / venta</h2>
-      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá una sola vez los datos comunes, después escaneás las caravanas de los que salen.</p>
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="an-cliente-egr">Cliente / Destino *</label>
-          <input id="an-cliente-egr" type="text" placeholder="Cliente" list="lista-clientes-an" required />
-          <datalist id="lista-clientes-an"></datalist>
-        </div>
-        <div class="form-group">
-          <label for="an-fecha-egr">Fecha egreso *</label>
-          <input id="an-fecha-egr" type="date" required />
-        </div>
-        <div class="form-group">
-          <label for="an-peso-egr">Peso prom. salida (kg/cab)</label>
-          <input id="an-peso-egr" type="number" min="0" step="any" placeholder="Ej: 460" />
-        </div>
-        <div class="form-group">
-          <label for="an-precio-egr">Precio $/kg</label>
-          <input id="an-precio-egr" type="number" min="0" step="any" placeholder="Ej: 4800" />
-        </div>
-        <div class="form-group">
-          <label for="an-cantidad-egr">Cantidad a egresar</label>
-          <input id="an-cantidad-egr" type="number" min="0" step="1" placeholder="Ej: 30" oninput="actualizarContadorEgreso()" />
-        </div>
-        <div class="form-group" style="grid-column:1/-1">
-          <label for="an-notas-egr">Notas del egreso</label>
-          <textarea id="an-notas-egr" placeholder="Remito, observaciones…"></textarea>
-        </div>
-      </div>
-      <div class="form-actions" style="justify-content:flex-end">
-        <button type="button" class="btn btn-secondary" onclick="reiniciarEgreso()">🔄 Reiniciar egreso</button>
-      </div>
-    </div>
-
-    <!-- 4. Escanear caravanas para egresar -->
-    <div class="card" style="border-left:4px solid #7c3aed">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
-        <h2 style="margin:0">📤 Escanear caravanas a egresar</h2>
-        <span id="contador-egreso" style="font-size:1rem;font-weight:800;color:#5b21b6;background:#ede9fe;padding:.35rem .85rem;border-radius:99px">0 / 0</span>
-      </div>
-      <p style="font-size:.85rem;color:var(--gray);margin:.6rem 0">Cada caravana se valida contra el stock actual. Si no está en stock, te avisa.</p>
-
-      <input id="an-foto-egr" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'egr')" />
-      <button type="button" class="btn btn-primary" style="font-size:1.05rem;padding:1rem 1.5rem;width:100%;background:#7c3aed" onclick="iniciarCapturaEgreso()">📷 Tomar foto de caravana <small style="opacity:.6">v5</small></button>
-
-      <div id="an-ocr-status-egr" style="font-size:.85rem;color:var(--gray);margin-top:.6rem"></div>
-      <img id="an-preview-egr" style="display:none;width:100%;max-height:280px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
-
-      <!-- Caja de confirmación / validación -->
-      <div id="confirma-egreso" style="display:none;margin-top:.75rem;border-radius:10px;padding:.85rem">
-        <div id="confirma-egreso-titulo" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem"></div>
-        <input id="an-caravana-egr" type="text" style="font-size:1.25rem;font-weight:800;padding:.65rem;width:100%;text-align:center" placeholder="N° caravana" oninput="validarCaravanaEgreso()" />
-        <div id="confirma-egreso-info" style="font-size:.85rem;margin-top:.5rem"></div>
-        <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
-          <button type="button" id="btn-confirmar-egreso" class="btn btn-primary" style="flex:1;font-size:1rem;padding:.8rem;background:#7c3aed" onclick="confirmarEgreso()">✅ Egresar y siguiente</button>
-          <button type="button" class="btn btn-secondary" onclick="cancelarEgreso()">Descartar</button>
-        </div>
-      </div>
-
-      <!-- Lista de caravanas egresadas en esta tanda -->
-      <div id="egresos-lote-wrap" style="display:none;margin-top:1rem;border-top:1px solid var(--border);padding-top:.8rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-          <span style="font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Egresadas en esta tanda</span>
-          <button type="button" class="btn btn-danger btn-sm" onclick="deshacerUltimoEgreso()">↶ Deshacer última</button>
-        </div>
-        <div id="egresos-lote-list" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
-      </div>
-    </div>
-
-    <!-- Listado -->
-    <div class="card">
-      <h2>📋 Animales</h2>
-      <div class="toolbar">
-        <input id="an-search" type="search" placeholder="Buscar caravana, campo, cliente…" oninput="renderAnimales()" />
-        <input id="an-filter-categoria" type="hidden" value="" />
-        <select id="an-filter-estado" onchange="renderAnimales()" style="width:auto;min-width:140px">
-          <option value="">Todos</option>
-          <option value="En stock">En stock</option>
-          <option value="Egresado">Egresados</option>
-        </select>
-        <button class="btn btn-blue btn-sm" onclick="exportAnimalesCSV()">Exportar CSV</button>
-        <button class="btn btn-primary btn-sm" onclick="exportarSenasa()" style="background:#0891b2">📑 Reporte SENASA</button>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Caravana</th>
-              <th>Categoría</th>
-              <th>Campo</th>
-              <th>Ingreso</th>
-              <th>Peso ing.</th>
-              <th>Peso sal.</th>
-              <th>Egreso</th>
-              <th>Cliente</th>
-              <th>$ Total</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="tabla-animales"></tbody>
         </table>
       </div>
     </div>
@@ -1632,7 +1254,6 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <script>
 // ═══════════════════════════════════════════
@@ -1661,11 +1282,9 @@ let clientes    = [];
 let notas       = [];
 let campos      = [];
 let proveedores = [];
-let siembras    = [];
-let animales    = [];
 
 // Contadores para saber cuándo todos los listeners cargaron por primera vez
-let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false, siembras: false, animales: false };
+let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false };
 
 function checkLoaded() {
   return Object.values(_loaded).every(Boolean);
@@ -1708,18 +1327,6 @@ db.collection('proveedores').orderBy('nombre','asc').onSnapshot(snap => {
   if (checkLoaded()) renderAll();
 });
 
-db.collection('siembras').onSnapshot(snap => {
-  siembras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  _loaded.siembras = true;
-  if (checkLoaded()) renderAll();
-});
-
-db.collection('animales').onSnapshot(snap => {
-  animales = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  _loaded.animales = true;
-  if (checkLoaded()) renderAll();
-});
-
 // ── helpers Firestore ──
 const COL = {
   salidas:     () => db.collection('salidas'),
@@ -1728,8 +1335,6 @@ const COL = {
   notas:       () => db.collection('notas'),
   campos:      () => db.collection('campos'),
   proveedores: () => db.collection('proveedores'),
-  siembras:    () => db.collection('siembras'),
-  animales:    () => db.collection('animales'),
 };
 
 const PRODUCTOS = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría','Otro'];
@@ -1815,24 +1420,14 @@ function calcStock() {
   const stock = {};
   PRODUCTOS.forEach(p => stock[p] = 0);
 
-  // Granos y Recría se cuentan por ingresos - salidas (colectivo).
-  // Engorde se cuenta desde el registro individual de animales (más abajo).
   ingresos.forEach(i => {
-    if (i.producto === 'Hacienda Engorde') return;
     if (stock[i.producto] !== undefined) stock[i.producto] += parseFloat(i.cantidad) || 0;
     else stock[i.producto] = parseFloat(i.cantidad) || 0;
   });
 
   salidas.forEach(s => {
-    if (s.producto === 'Hacienda Engorde') return;
     if (stock[s.producto] !== undefined) stock[s.producto] -= parseFloat(s.cantidad) || 0;
     else stock[s.producto] = -(parseFloat(s.cantidad) || 0);
-  });
-
-  // Hacienda Engorde: 1 caravana en stock = 1 cabeza
-  animales.forEach(a => {
-    if (a.estado !== 'En stock') return;
-    if (a.categoria === 'Hacienda Engorde') stock['Hacienda Engorde'] += 1;
   });
 
   return stock;
@@ -2644,926 +2239,6 @@ function exportResumenCSV() {
 }
 
 // ═══════════════════════════════════════════
-//  PLAN DE SIEMBRA
-// ═══════════════════════════════════════════
-
-const SIEMBRA_ICONOS = { 'Maíz':'🌽','Soja':'🌿','Trigo':'🌾','Girasol':'🌻','Sorgo':'🌾','Cebada':'🌾','Otro':'📦' };
-const SIEMBRA_BADGE = { 'Planificado':'b-gray','Sembrado':'b-amber','En desarrollo':'b-blue','Cosechado':'b-green' };
-
-let editSiembraId = null;
-
-document.getElementById('form-siembra').addEventListener('submit', async e => {
-  e.preventDefault();
-  const campoStr = document.getElementById('si-campo').value.trim();
-
-  // Validar campo contra tabla
-  const okCampo = await validarYAgregarRef(campoStr, campos, 'Campos',
-    () => COL.campos().add({ nombre: campoStr, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
-  );
-  if (!okCampo) return;
-
-  const rec = {
-    campania:     document.getElementById('si-campania').value.trim(),
-    cultivo:      document.getElementById('si-cultivo').value,
-    campo:        campoStr,
-    hectareas:    parseFloat(document.getElementById('si-hectareas').value) || 0,
-    variedad:     document.getElementById('si-variedad').value.trim(),
-    rinde:        parseFloat(document.getElementById('si-rinde').value) || 0,
-    fechaSiembra: document.getElementById('si-fecha-siembra').value,
-    fechaCosecha: document.getElementById('si-fecha-cosecha').value,
-    estado:       document.getElementById('si-estado').value,
-    notas:        document.getElementById('si-notas').value.trim(),
-    creadoEn:     firebase.firestore.FieldValue.serverTimestamp(),
-  };
-  COL.siembras().add(rec).then(() => {
-    resetSiembra();
-    toast('✅ Plan de siembra guardado', '#14532d');
-  }).catch(() => toast('❌ Error al guardar.'));
-});
-
-function resetSiembra() {
-  document.getElementById('form-siembra').reset();
-}
-
-function renderSiembras() {
-  // Datalist de campos para el formulario de siembra
-  const optsCampos = [...new Set(campos.map(c => c.nombre))].map(n => `<option value="${esc(n)}">`).join('');
-  const dl = document.getElementById('lista-campos-siembra');
-  if (dl) dl.innerHTML = optsCampos;
-
-  // KPIs
-  const totalHas    = siembras.reduce((s, r) => s + (parseFloat(r.hectareas)||0), 0);
-  const totalProd   = siembras.reduce((s, r) => s + ((parseFloat(r.hectareas)||0) * (parseFloat(r.rinde)||0)), 0);
-  const planActivos = siembras.filter(r => r.estado !== 'Cosechado').length;
-  const cosechados  = siembras.filter(r => r.estado === 'Cosechado').length;
-
-  const kpisEl = document.getElementById('siembra-kpis');
-  if (kpisEl) {
-    kpisEl.innerHTML = `
-      <div style="background:var(--green-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.4px">Total hectáreas</div>
-        <div style="font-size:1.3rem;font-weight:800;color:var(--green-dark);margin-top:.25rem">${fmtNum(totalHas)} ha</div>
-      </div>
-      <div style="background:#dbeafe;border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px">Producción estimada</div>
-        <div style="font-size:1.3rem;font-weight:800;color:#1e3a8a;margin-top:.25rem">${fmtNum(Math.round(totalProd))} tn</div>
-      </div>
-      <div style="background:var(--amber-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.4px">En curso</div>
-        <div style="font-size:1.3rem;font-weight:800;color:#92400e;margin-top:.25rem">${planActivos}</div>
-      </div>
-      <div style="background:var(--gray-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Cosechados</div>
-        <div style="font-size:1.3rem;font-weight:800;color:var(--gray-dark);margin-top:.25rem">${cosechados}</div>
-      </div>
-    `;
-  }
-
-  // Tabla filtrada
-  const q     = (document.getElementById('si-search')?.value || '').toLowerCase();
-  const fCult = document.getElementById('si-filter-cultivo')?.value || '';
-  const fEst  = document.getElementById('si-filter-estado')?.value || '';
-
-  const rows = siembras.filter(r => {
-    const match = !q || [r.campania,r.cultivo,r.campo,r.variedad,r.notas].some(v => String(v||'').toLowerCase().includes(q));
-    return match && (!fCult || r.cultivo === fCult) && (!fEst || r.estado === fEst);
-  }).sort((a,b) => (b.fechaSiembra||'').localeCompare(a.fechaSiembra||''));
-
-  const tbody = document.getElementById('tabla-siembras');
-  if (!tbody) return;
-  if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" class="empty-msg">No hay planes de siembra cargados.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map(r => {
-    const has   = parseFloat(r.hectareas)||0;
-    const rind  = parseFloat(r.rinde)||0;
-    const prod  = has * rind;
-    return `
-    <tr>
-      <td><strong>${esc(r.campania||'')}</strong></td>
-      <td>${SIEMBRA_ICONOS[r.cultivo]||''} ${esc(r.cultivo||'')}</td>
-      <td><span class="badge b-green">📍 ${esc(r.campo||'')}</span></td>
-      <td>${fmtNum(has)}</td>
-      <td style="color:var(--gray);font-size:.82rem">${esc(r.variedad||'—')}</td>
-      <td>${rind ? fmtNum(rind) : '—'}</td>
-      <td><strong>${prod ? fmtNum(Math.round(prod))+' tn' : '—'}</strong></td>
-      <td>${r.fechaSiembra ? fmtDate(r.fechaSiembra) : '—'}</td>
-      <td>${r.fechaCosecha ? fmtDate(r.fechaCosecha) : '—'}</td>
-      <td><span class="badge ${SIEMBRA_BADGE[r.estado]||'b-gray'}">${esc(r.estado||'')}</span></td>
-      <td>
-        <button class="btn btn-secondary btn-sm" onclick="openEditSiembra('${r.id}')">Editar</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteSiembra('${r.id}'))">🗑️</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-function openEditSiembra(id) {
-  const r = siembras.find(x => x.id === id);
-  if (!r) return;
-  editSiembraId = id;
-  document.getElementById('esi-campania').value     = r.campania||'';
-  document.getElementById('esi-cultivo').value      = r.cultivo||'';
-  document.getElementById('esi-campo').value        = r.campo||'';
-  document.getElementById('esi-hectareas').value    = r.hectareas||'';
-  document.getElementById('esi-variedad').value     = r.variedad||'';
-  document.getElementById('esi-rinde').value        = r.rinde||'';
-  document.getElementById('esi-fecha-siembra').value = r.fechaSiembra||'';
-  document.getElementById('esi-fecha-cosecha').value = r.fechaCosecha||'';
-  document.getElementById('esi-estado').value       = r.estado||'Planificado';
-  document.getElementById('esi-notas').value        = r.notas||'';
-  document.getElementById('modal-siembra').classList.add('open');
-}
-
-document.getElementById('form-edit-siembra').addEventListener('submit', e => {
-  e.preventDefault();
-  if (!editSiembraId) return;
-  const data = {
-    campania:     document.getElementById('esi-campania').value.trim(),
-    cultivo:      document.getElementById('esi-cultivo').value,
-    campo:        document.getElementById('esi-campo').value.trim(),
-    hectareas:    parseFloat(document.getElementById('esi-hectareas').value) || 0,
-    variedad:     document.getElementById('esi-variedad').value.trim(),
-    rinde:        parseFloat(document.getElementById('esi-rinde').value) || 0,
-    fechaSiembra: document.getElementById('esi-fecha-siembra').value,
-    fechaCosecha: document.getElementById('esi-fecha-cosecha').value,
-    estado:       document.getElementById('esi-estado').value,
-    notas:        document.getElementById('esi-notas').value.trim(),
-  };
-  COL.siembras().doc(editSiembraId).update(data).then(() => {
-    closeModal('modal-siembra');
-    toast('✅ Plan actualizado', '#14532d');
-  }).catch(() => toast('❌ Error al guardar.'));
-});
-
-function deleteSiembra(id) {
-  COL.siembras().doc(id).delete().then(() => toast('🗑️ Plan eliminado'))
-    .catch(() => toast('❌ Error al eliminar.'));
-}
-
-function exportSiembrasCSV() {
-  if (!siembras.length) { toast('No hay planes para exportar'); return; }
-  const cols = ['Campaña','Cultivo','Campo','Hectáreas','Variedad','Rinde tn/ha','Producción estimada tn','Fecha siembra','Fecha cosecha','Estado','Notas'];
-  const data = siembras.map(r => {
-    const prod = (parseFloat(r.hectareas)||0) * (parseFloat(r.rinde)||0);
-    return [r.campania,r.cultivo,r.campo,r.hectareas,r.variedad,r.rinde,prod,r.fechaSiembra,r.fechaCosecha,r.estado,r.notas]
-      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',');
-  });
-  downloadCSV([cols.join(','), ...data].join('\r\n'), `siembras_blenda_${todayISO()}.csv`);
-  toast('📄 CSV exportado');
-}
-
-// ═══════════════════════════════════════════
-//  ANIMALES (registro individual con OCR de caravana)
-// ═══════════════════════════════════════════
-
-// Declaración previa de variables del lote (deben existir antes de cualquier llamada)
-let loteActual = [];
-let loteIdActual = null;
-let egresosLote = [];
-
-// Inicializar fechas
-document.getElementById('an-fecha-ing').value = todayISO();
-document.getElementById('an-fecha-egr').value = todayISO();
-// Inicializar contadores
-actualizarContadorLote();
-actualizarContadorEgreso();
-
-// ── Cámara en vivo (getUserMedia) ──
-const camStreams = { ing: null, egr: null };
-
-async function abrirCamara(tipo) {
-  try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      throw new Error('Sin soporte de cámara en este navegador');
-    }
-    // Pedir cámara trasera en alta resolución
-    const constraints = {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width:  { ideal: 1920 },
-        height: { ideal: 1080 },
-      },
-      audio: false,
-    };
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-    } catch(e) {
-      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-    }
-    camStreams[tipo] = stream;
-    const video = document.getElementById(`cam-video-${tipo}`);
-    video.srcObject = stream;
-    await video.play().catch(()=>{});
-    document.getElementById(`cam-container-${tipo}`).style.display = '';
-    document.getElementById(`cam-controls-${tipo}`).style.display = 'none';
-  } catch(e) {
-    console.warn('Cámara:', e);
-    toast('⚠️ No se pudo abrir la cámara. Permití el acceso o subí la foto manualmente.');
-  }
-}
-
-function cerrarCamara(tipo) {
-  const stream = camStreams[tipo];
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  camStreams[tipo] = null;
-  const video = document.getElementById(`cam-video-${tipo}`);
-  if (video) video.srcObject = null;
-  document.getElementById(`cam-container-${tipo}`).style.display = 'none';
-  document.getElementById(`cam-controls-${tipo}`).style.display = '';
-}
-
-async function capturarFoto(tipo) {
-  const stream = camStreams[tipo];
-  const video  = document.getElementById(`cam-video-${tipo}`);
-  const canvas = document.getElementById(`cam-canvas-${tipo}`);
-  if (!stream && (!video || !video.videoWidth)) { toast('⚠️ La cámara no está lista aún'); return; }
-
-  // Intentar ImageCapture (foto a resolución real del sensor)
-  try {
-    if ('ImageCapture' in window && stream) {
-      const track = stream.getVideoTracks()[0];
-      const imageCapture = new ImageCapture(track);
-      const blob = await imageCapture.takePhoto();
-      cerrarCamara(tipo);
-      if (blob) procesarFotoOCR(blob, tipo);
-      return;
-    }
-  } catch(e) {
-    console.warn('ImageCapture falló, uso canvas:', e);
-  }
-
-  // Fallback: capturar frame del video con canvas
-  if (!video.videoWidth) { toast('⚠️ Cámara no lista'); return; }
-  canvas.width  = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
-  canvas.toBlob(blob => {
-    cerrarCamara(tipo);
-    if (blob) procesarFotoOCR(blob, tipo);
-  }, 'image/jpeg', 0.95);
-}
-
-// Calcula el umbral óptimo de Otsu (separa fondo/figura automáticamente)
-function umbralOtsu(histograma, totalPx) {
-  let sum = 0;
-  for (let i = 0; i < 256; i++) sum += i * histograma[i];
-  let sumB = 0, wB = 0, wF = 0, maxVar = 0, umbral = 127;
-  for (let t = 0; t < 256; t++) {
-    wB += histograma[t];
-    if (wB === 0) continue;
-    wF = totalPx - wB;
-    if (wF === 0) break;
-    sumB += t * histograma[t];
-    const mB = sumB / wB;
-    const mF = (sum - sumB) / wF;
-    const between = wB * wF * (mB - mF) * (mB - mF);
-    if (between > maxVar) { maxVar = between; umbral = t; }
-  }
-  return umbral;
-}
-
-// Threshold adaptativo: divide la imagen en bloques, calcula Otsu local en cada bloque.
-// Maneja sombras y luz desigual mucho mejor que un threshold global.
-function binarizadoAdaptativo(grises, w, h, bloques = 6) {
-  const bin = new Uint8ClampedArray(w * h);
-  const blkW = Math.ceil(w / bloques);
-  const blkH = Math.ceil(h / bloques);
-  // Calcular umbral por bloque
-  const umbrales = [];
-  for (let by = 0; by < bloques; by++) {
-    umbrales.push([]);
-    for (let bx = 0; bx < bloques; bx++) {
-      const x0 = bx * blkW, y0 = by * blkH;
-      const x1 = Math.min(x0 + blkW, w), y1 = Math.min(y0 + blkH, h);
-      const histo = new Array(256).fill(0);
-      let cnt = 0;
-      for (let y = y0; y < y1; y++) {
-        for (let x = x0; x < x1; x++) {
-          histo[grises[y*w + x]]++;
-          cnt++;
-        }
-      }
-      umbrales[by].push(umbralOtsu(histo, cnt));
-    }
-  }
-  // Aplicar (interpolando entre bloques para evitar bordes duros)
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const bx = Math.min(Math.floor(x / blkW), bloques - 1);
-      const by = Math.min(Math.floor(y / blkH), bloques - 1);
-      bin[y*w + x] = grises[y*w + x] > umbrales[by][bx] ? 255 : 0;
-    }
-  }
-  return bin;
-}
-
-// Preprocesa: escala, gris, threshold adaptativo. Devuelve { normal, invertida }.
-async function preprocesarImagen(file) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => {
-      const maxLado = 1800;
-      const escala = Math.min(maxLado / Math.max(img.width, img.height), 4);
-      const w = Math.round(img.width * escala);
-      const h = Math.round(img.height * escala);
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      const data = ctx.getImageData(0, 0, w, h);
-      const px = data.data;
-
-      // A escala de grises
-      const grises = new Uint8ClampedArray(w * h);
-      for (let i = 0, j = 0; i < px.length; i += 4, j++) {
-        grises[j] = Math.round(0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]);
-      }
-
-      // Binarizado adaptativo (maneja sombras)
-      const bin = binarizadoAdaptativo(grises, w, h, 8);
-
-      // Volcamos al canvas en RGBA
-      const out = new Uint8ClampedArray(px.length);
-      const outInv = new Uint8ClampedArray(px.length);
-      for (let i = 0, j = 0; i < px.length; i += 4, j++) {
-        out[i] = out[i+1] = out[i+2] = bin[j];        out[i+3] = 255;
-        outInv[i] = outInv[i+1] = outInv[i+2] = 255 - bin[j]; outInv[i+3] = 255;
-      }
-
-      const c1 = document.createElement('canvas'); c1.width = w; c1.height = h;
-      c1.getContext('2d').putImageData(new ImageData(out, w, h), 0, 0);
-      const c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
-      c2.getContext('2d').putImageData(new ImageData(outInv, w, h), 0, 0);
-
-      Promise.all([
-        new Promise(r => c1.toBlob(r, 'image/jpeg', 0.95)),
-        new Promise(r => c2.toBlob(r, 'image/jpeg', 0.95)),
-      ]).then(([normal, invertida]) => resolve({ normal: normal || file, invertida: invertida || file }));
-    };
-    img.onerror = () => resolve({ normal: file, invertida: file });
-    img.src = URL.createObjectURL(file);
-  });
-}
-
-// Apagar cámaras al cambiar de página
-const _origShowPage = showPage;
-showPage = function(page, el) {
-  if (page !== 'animales') { cerrarCamara('ing'); cerrarCamara('egr'); }
-  return _origShowPage(page, el);
-};
-
-// ── OCR: extrae número de caravana de la foto con Tesseract.js ──
-async function procesarFotoOCR(file, tipo) {
-  if (!file) return;
-  const statusEl  = document.getElementById('an-ocr-status-' + tipo);
-  const previewEl = document.getElementById('an-preview-' + tipo);
-  const inputEl   = document.getElementById('an-caravana-' + tipo);
-
-  // Mostrar preview original
-  previewEl.src = URL.createObjectURL(file);
-  previewEl.style.display = 'block';
-
-  // Mostrar dimensiones reales de la foto (diagnóstico de calidad)
-  const tmpImg = new Image();
-  tmpImg.onload = () => {
-    const kb = Math.round(file.size / 1024);
-    const dims = `${tmpImg.naturalWidth}×${tmpImg.naturalHeight}`;
-    const calidad = tmpImg.naturalWidth >= 1500 ? '🟢 alta' :
-                    tmpImg.naturalWidth >= 800  ? '🟡 media' : '🔴 baja';
-    statusEl.innerHTML = `📷 ${dims}px · ${kb} KB · resolución ${calidad}<br>⏳ Preparando imagen…`;
-  };
-  tmpImg.src = URL.createObjectURL(file);
-
-  if (typeof Tesseract === 'undefined') {
-    statusEl.innerHTML = '⚠️ OCR no disponible. Cargá el número manualmente.';
-    return;
-  }
-
-  try {
-    // Preprocesar: dos versiones (binarizada normal y invertida) para máxima cobertura
-    const { normal, invertida } = await preprocesarImagen(file);
-    statusEl.innerHTML = '⏳ Leyendo caravana…';
-
-    // Probamos varias combinaciones de imagen × modo PSM y elegimos el mejor candidato.
-    // PSM 6 = bloque uniforme · 7 = línea única · 8 = palabra única · 11 = texto disperso · 13 = línea cruda
-    // 3 intentos rápidos — los más efectivos en pruebas
-    const intentos = [
-      { img: normal,    psm: '7' },   // línea única (mejor para caravanas)
-      { img: normal,    psm: '6' },   // bloque uniforme
-      { img: invertida, psm: '7' },   // fallback texto claro sobre oscuro
-    ];
-
-    const candidatos = [];
-    let i = 0;
-    for (const cfg of intentos) {
-      i++;
-      statusEl.innerHTML = `⏳ Intento ${i}/${intentos.length}…`;
-      try {
-        const result = await Tesseract.recognize(cfg.img, 'eng', {
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
-          tessedit_pageseg_mode: cfg.psm,
-          preserve_interword_spaces: '1',
-        });
-        const conf = result.data.confidence || 0;
-        // Limpiar: dejar solo alfanumérico + espacios, en MAYÚSCULAS
-        const text = (result.data.text || '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-
-        // Patrones de caravana:
-        //  (1) Letras + dígitos juntos o separados por espacio: "SLT 356", "ABC123"
-        //  (2) Solo dígitos largos: "12345"
-        const patrones = [
-          /([A-Z]{1,4})\s?(\d{2,6})/g,   // letras + número
-          /(\d{3,7})/g,                   // solo números largos
-        ];
-
-        for (const re of patrones) {
-          let m;
-          while ((m = re.exec(text)) !== null) {
-            const valor = m[1] && m[2] ? (m[1] + ' ' + m[2]) : m[0];
-            candidatos.push({ valor: valor.trim(), conf, psm: cfg.psm });
-          }
-        }
-      } catch(e) { /* ignorar este intento */ }
-    }
-
-    if (candidatos.length) {
-      // Agrupar por valor y rankear
-      const score = {};
-      candidatos.forEach(c => {
-        if (!score[c.valor]) score[c.valor] = { veces: 0, confTotal: 0 };
-        score[c.valor].veces++;
-        score[c.valor].confTotal += c.conf;
-      });
-      const ranking = Object.entries(score).map(([valor, s]) => ({
-        valor,
-        peso: s.veces * (valor.includes(' ') ? 200 : 100) * valor.length + s.confTotal,
-      })).sort((a,b) => b.peso - a.peso);
-
-      const mejor = ranking[0].valor;
-      const otros = ranking.slice(1, 4).map(r => r.valor);
-      inputEl.value = mejor;
-      statusEl.innerHTML = `✅ Detectado: <strong style="font-size:1rem">${mejor}</strong>` +
-        (otros.length ? ` <small style="color:var(--gray)">· otros: ${otros.join(', ')}</small>` : '');
-
-      if (tipo === 'ing') {
-        mostrarConfirmacionCaravana(mejor);
-      } else if (tipo === 'egr') {
-        mostrarConfirmacionEgreso(mejor);
-      }
-    } else {
-      statusEl.innerHTML = `⚠️ No se detectó caravana. <small style="color:var(--gray)">Cargá el N° a mano.</small>`;
-      if (tipo === 'ing') mostrarConfirmacionCaravana('');
-      if (tipo === 'egr') mostrarConfirmacionEgreso('');
-    }
-  } catch (e) {
-    console.warn('OCR error:', e);
-    statusEl.innerHTML = '⚠️ Error al leer la foto. Cargá el N° manualmente.';
-  }
-}
-
-// Lote actual: lista de IDs de animales cargados en esta sesión de carga
-// (loteActual y loteIdActual declarados arriba antes de los init calls)
-
-function actualizarContadorLote() {
-  const esperada = parseInt(document.getElementById('an-cantidad-esp').value) || 0;
-  const cargada  = loteActual.length;
-  const el = document.getElementById('contador-lote');
-  if (!el) return;
-  let color = 'var(--green-dark)', bg = 'var(--green-light)';
-  if (esperada > 0 && cargada > esperada) { color = '#7f1d1d'; bg = 'var(--red-light)'; }
-  else if (esperada > 0 && cargada === esperada) { color = '#fff'; bg = 'var(--green)'; }
-  el.style.color = color;
-  el.style.background = bg;
-  el.textContent = esperada > 0 ? `${cargada} / ${esperada}` : `${cargada}`;
-}
-
-function renderCaravanasLote() {
-  const wrap = document.getElementById('caravanas-lote-wrap');
-  const list = document.getElementById('caravanas-lote-list');
-  if (!wrap || !list) return;
-  if (loteActual.length === 0) { wrap.style.display = 'none'; return; }
-  wrap.style.display = 'block';
-  list.innerHTML = loteActual.map(c =>
-    `<span style="background:#fff;border:1.5px solid var(--green);border-radius:99px;padding:.3rem .7rem;font-size:.82rem;font-weight:700;color:var(--green-dark)">🐄 ${esc(c.caravana)}</span>`
-  ).join('');
-}
-
-function iniciarCapturaCaravana() {
-  // Validar que el lote esté configurado
-  const campo = document.getElementById('an-campo-ing').value.trim();
-  const fecha = document.getElementById('an-fecha-ing').value;
-  const peso  = parseFloat(document.getElementById('an-peso-ing').value) || 0;
-  const cant  = parseInt(document.getElementById('an-cantidad-esp').value) || 0;
-  if (!campo) { toast('⚠️ Cargá el Campo arriba'); return; }
-  if (!fecha) { toast('⚠️ Cargá la fecha del ingreso'); return; }
-  if (!cant)  { toast('⚠️ Cargá la cantidad de animales esperada'); return; }
-  if (!peso)  { toast('⚠️ Cargá el peso aproximado'); return; }
-  // Asignar loteId si todavía no hay uno
-  if (!loteIdActual) loteIdActual = 'lote_' + Date.now();
-  // Abrir la cámara
-  document.getElementById('an-foto-ing').click();
-}
-
-function mostrarConfirmacionCaravana(numero) {
-  document.getElementById('an-caravana-ing').value = numero;
-  document.getElementById('confirma-caravana').style.display = 'block';
-}
-
-function cancelarCaravana() {
-  document.getElementById('confirma-caravana').style.display = 'none';
-  document.getElementById('an-caravana-ing').value = '';
-  document.getElementById('an-foto-ing').value = '';
-  document.getElementById('an-preview-ing').style.display = 'none';
-  document.getElementById('an-ocr-status-ing').innerHTML = '';
-}
-
-async function confirmarCaravana() {
-  const caravana = document.getElementById('an-caravana-ing').value.trim();
-  if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
-
-  const campo     = document.getElementById('an-campo-ing').value.trim();
-  const proveedor = document.getElementById('an-proveedor-ing').value.trim();
-  const fecha     = document.getElementById('an-fecha-ing').value;
-  const peso      = parseFloat(document.getElementById('an-peso-ing').value) || 0;
-  const notas     = document.getElementById('an-notas-ing').value.trim();
-  const categoria = 'Hacienda Engorde';
-
-  // Duplicado en stock
-  const duplicado = animales.find(a => (a.caravana||'').trim() === caravana && a.estado === 'En stock');
-  if (duplicado) {
-    if (!confirm(`Ya hay un animal con caravana "${caravana}" en stock. ¿Cargar igual?`)) return;
-  }
-
-  // Validar campo/proveedor en tablas (solo la 1ra vez del lote)
-  if (loteActual.length === 0) {
-    const okCampo = await validarYAgregarRef(campo, campos, 'Campos',
-      () => COL.campos().add({ nombre: campo, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
-    );
-    if (!okCampo) return;
-    if (proveedor) {
-      const okProv = await validarYAgregarRef(proveedor, proveedores, 'Proveedores',
-        () => COL.proveedores().add({ nombre: proveedor, cuit:'', tel:'', email:'', localidad:'', rubro:'', notas:'' })
-      );
-      if (!okProv) return;
-    }
-  }
-
-  const rec = {
-    caravana, categoria,
-    pesoIngreso: peso,
-    campo, proveedor,
-    fechaIngreso: fecha || todayISO(),
-    estado: 'En stock',
-    notas,
-    loteId: loteIdActual,
-    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
-  };
-  try {
-    const docRef = await COL.animales().add(rec);
-    loteActual.push({ id: docRef.id, caravana });
-    actualizarContadorLote();
-    renderCaravanasLote();
-
-    // Limpiar campos de captura y abrir cámara automáticamente
-    document.getElementById('confirma-caravana').style.display = 'none';
-    document.getElementById('an-caravana-ing').value = '';
-    document.getElementById('an-foto-ing').value = '';
-    document.getElementById('an-preview-ing').style.display = 'none';
-    document.getElementById('an-ocr-status-ing').innerHTML = '';
-
-    const esperada = parseInt(document.getElementById('an-cantidad-esp').value) || 0;
-    if (esperada > 0 && loteActual.length >= esperada) {
-      toast(`✅ ${caravana} cargado · lote completo (${loteActual.length}/${esperada})`, '#14532d');
-    } else {
-      toast(`✅ ${caravana} cargado · abriendo cámara…`, '#14532d');
-      setTimeout(() => document.getElementById('an-foto-ing').click(), 400);
-    }
-  } catch(e) {
-    console.warn(e);
-    toast('❌ Error al guardar.');
-  }
-}
-
-async function borrarUltimaCaravana() {
-  if (loteActual.length === 0) return;
-  const ultima = loteActual[loteActual.length - 1];
-  if (!confirm(`¿Borrar la última caravana cargada (${ultima.caravana})?`)) return;
-  try {
-    await COL.animales().doc(ultima.id).delete();
-    loteActual.pop();
-    actualizarContadorLote();
-    renderCaravanasLote();
-    toast(`🗑️ ${ultima.caravana} borrada del lote`);
-  } catch(e) { toast('❌ Error al borrar'); }
-}
-
-function reiniciarLote() {
-  if (loteActual.length && !confirm(`¿Reiniciar el lote? Los ${loteActual.length} animales ya cargados quedan guardados, pero se inicia un lote nuevo.`)) return;
-  loteActual = [];
-  loteIdActual = null;
-  document.getElementById('an-cantidad-esp').value = '';
-  document.getElementById('an-notas-ing').value = '';
-  document.getElementById('an-fecha-ing').value = todayISO();
-  cancelarCaravana();
-  actualizarContadorLote();
-  renderCaravanasLote();
-  toast('🔄 Lote reiniciado');
-}
-
-// Función legacy mantenida por compatibilidad — ya no se usa desde la UI
-function resetAnimalIng() { reiniciarLote(); }
-
-// ── Reporte SENASA ──
-function exportarSenasa() {
-  const enStock = animales.filter(a => a.estado === 'En stock' && a.categoria === 'Hacienda Engorde');
-  if (!enStock.length) { toast('No hay animales en stock para reportar'); return; }
-  const cols = ['Caravana','Fecha ingreso','Campo','Peso ingreso (kg)','Proveedor','Lote'];
-  const data = enStock
-    .sort((a,b) => (a.caravana||'').localeCompare(b.caravana||''))
-    .map(a => [a.caravana, a.fechaIngreso, a.campo, a.pesoIngreso, a.proveedor||'', a.loteId||'']
-      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
-  const encabezado = [
-    `"REPORTE SENASA — STOCK ACTUAL DE HACIENDA"`,
-    `"Generado: ${new Date().toLocaleString('es-AR')}"`,
-    `"Total cabezas en stock: ${enStock.length}"`,
-    '',
-    cols.join(','),
-    ...data,
-  ];
-  downloadCSV(encabezado.join('\r\n'), `senasa_stock_${todayISO()}.csv`);
-  toast(`📑 Reporte SENASA generado · ${enStock.length} caravanas`, '#14532d');
-}
-
-// Egreso en lote (egresosLote declarado arriba antes de los init calls)
-
-function actualizarContadorEgreso() {
-  const esperada = parseInt(document.getElementById('an-cantidad-egr').value) || 0;
-  const cargada  = egresosLote.length;
-  const el = document.getElementById('contador-egreso');
-  if (!el) return;
-  let color = '#5b21b6', bg = '#ede9fe';
-  if (esperada > 0 && cargada > esperada) { color = '#7f1d1d'; bg = 'var(--red-light)'; }
-  else if (esperada > 0 && cargada === esperada) { color = '#fff'; bg = '#7c3aed'; }
-  el.style.color = color;
-  el.style.background = bg;
-  el.textContent = esperada > 0 ? `${cargada} / ${esperada}` : `${cargada}`;
-}
-
-function renderEgresosLote() {
-  const wrap = document.getElementById('egresos-lote-wrap');
-  const list = document.getElementById('egresos-lote-list');
-  if (!wrap || !list) return;
-  if (egresosLote.length === 0) { wrap.style.display = 'none'; return; }
-  wrap.style.display = 'block';
-  list.innerHTML = egresosLote.map(c =>
-    `<span style="background:#fff;border:1.5px solid #7c3aed;border-radius:99px;padding:.3rem .7rem;font-size:.82rem;font-weight:700;color:#5b21b6">📤 ${esc(c.caravana)}</span>`
-  ).join('');
-}
-
-function iniciarCapturaEgreso() {
-  const cliente = document.getElementById('an-cliente-egr').value.trim();
-  const fecha   = document.getElementById('an-fecha-egr').value;
-  if (!cliente) { toast('⚠️ Cargá el cliente arriba'); return; }
-  if (!fecha)   { toast('⚠️ Cargá la fecha de egreso arriba'); return; }
-  document.getElementById('an-foto-egr').click();
-}
-
-// Validar en vivo mientras escriben/corrigen la caravana
-function validarCaravanaEgreso() {
-  const caravana = document.getElementById('an-caravana-egr').value.trim();
-  const info = document.getElementById('confirma-egreso-info');
-  const btn  = document.getElementById('btn-confirmar-egreso');
-  const cont = document.getElementById('confirma-egreso');
-  if (!info || !btn) return;
-  if (!caravana) { info.innerHTML = ''; btn.disabled = false; return; }
-
-  const enStock = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'En stock');
-  if (enStock) {
-    info.innerHTML = `<span style="color:var(--green-dark);font-weight:600">✅ EN STOCK</span> · ingresó ${fmtDate(enStock.fechaIngreso)} · ${fmtNum(enStock.pesoIngreso)} kg · 📍 ${esc(enStock.campo)}`;
-    cont.style.background = 'var(--green-light)';
-    cont.style.border = '1.5px solid var(--green)';
-    btn.disabled = false;
-  } else {
-    const yaEgresado = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'Egresado');
-    if (yaEgresado) {
-      info.innerHTML = `<span style="color:var(--amber)">⚠️ YA EGRESADA</span> el ${fmtDate(yaEgresado.fechaEgreso)} a ${esc(yaEgresado.cliente||'—')}`;
-    } else {
-      info.innerHTML = `<span style="color:var(--red);font-weight:600">❌ NO ESTÁ EN STOCK</span> · revisá el N° o cargala primero como ingreso`;
-    }
-    cont.style.background = '#fee2e2';
-    cont.style.border = '1.5px solid var(--red)';
-    btn.disabled = true;
-  }
-}
-
-function mostrarConfirmacionEgreso(numero) {
-  document.getElementById('an-caravana-egr').value = numero;
-  document.getElementById('confirma-egreso-titulo').textContent = 'Caravana detectada';
-  document.getElementById('confirma-egreso').style.display = 'block';
-  validarCaravanaEgreso();
-}
-
-function cancelarEgreso() {
-  document.getElementById('confirma-egreso').style.display = 'none';
-  document.getElementById('an-caravana-egr').value = '';
-  document.getElementById('an-foto-egr').value = '';
-  document.getElementById('an-preview-egr').style.display = 'none';
-  document.getElementById('an-ocr-status-egr').innerHTML = '';
-}
-
-async function confirmarEgreso() {
-  const caravana = document.getElementById('an-caravana-egr').value.trim();
-  if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
-
-  const animal = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'En stock');
-  if (!animal) { toast(`❌ La caravana ${caravana} no está en stock`); return; }
-
-  const cliente = document.getElementById('an-cliente-egr').value.trim();
-  const fecha   = document.getElementById('an-fecha-egr').value;
-  const peso    = parseFloat(document.getElementById('an-peso-egr').value) || 0;
-  const precio  = parseFloat(document.getElementById('an-precio-egr').value) || 0;
-  const notas   = document.getElementById('an-notas-egr').value.trim();
-
-  // Validar cliente contra tabla (solo la 1ra vez del lote)
-  if (egresosLote.length === 0) {
-    const okCliente = await validarYAgregarRef(cliente, clientes, 'Clientes',
-      () => COL.clientes().add({ nombre: cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' })
-    );
-    if (!okCliente) return;
-  }
-
-  const data = {
-    estado: 'Egresado',
-    fechaEgreso: fecha || todayISO(),
-    pesoEgreso: peso,
-    precio,
-    cliente,
-    notasEgreso: notas,
-  };
-  try {
-    await COL.animales().doc(animal.id).update(data);
-    egresosLote.push({ id: animal.id, caravana });
-    actualizarContadorEgreso();
-    renderEgresosLote();
-
-    // Limpiar y reabrir cámara
-    document.getElementById('confirma-egreso').style.display = 'none';
-    document.getElementById('an-caravana-egr').value = '';
-    document.getElementById('an-foto-egr').value = '';
-    document.getElementById('an-preview-egr').style.display = 'none';
-    document.getElementById('an-ocr-status-egr').innerHTML = '';
-
-    const esperada = parseInt(document.getElementById('an-cantidad-egr').value) || 0;
-    if (esperada > 0 && egresosLote.length >= esperada) {
-      toast(`✅ ${caravana} egresado · tanda completa (${egresosLote.length}/${esperada})`, '#14532d');
-    } else {
-      toast(`✅ ${caravana} egresado · abriendo cámara…`, '#14532d');
-      setTimeout(() => document.getElementById('an-foto-egr').click(), 400);
-    }
-  } catch(e) {
-    toast('❌ Error al egresar.');
-  }
-}
-
-async function deshacerUltimoEgreso() {
-  if (egresosLote.length === 0) return;
-  const ultimo = egresosLote[egresosLote.length - 1];
-  if (!confirm(`¿Deshacer el último egreso (${ultimo.caravana})? La caravana vuelve a stock.`)) return;
-  try {
-    await COL.animales().doc(ultimo.id).update({
-      estado: 'En stock',
-      fechaEgreso: firebase.firestore.FieldValue.delete(),
-      pesoEgreso: firebase.firestore.FieldValue.delete(),
-      precio: firebase.firestore.FieldValue.delete(),
-      cliente: firebase.firestore.FieldValue.delete(),
-      notasEgreso: firebase.firestore.FieldValue.delete(),
-    });
-    egresosLote.pop();
-    actualizarContadorEgreso();
-    renderEgresosLote();
-    toast(`↶ ${ultimo.caravana} vuelve a stock`);
-  } catch(e) { toast('❌ Error al deshacer'); }
-}
-
-function reiniciarEgreso() {
-  if (egresosLote.length && !confirm(`¿Reiniciar el egreso? Los ${egresosLote.length} animales ya egresados quedan así, pero arrancás una tanda nueva.`)) return;
-  egresosLote = [];
-  document.getElementById('an-cantidad-egr').value = '';
-  document.getElementById('an-cliente-egr').value = '';
-  document.getElementById('an-peso-egr').value = '';
-  document.getElementById('an-precio-egr').value = '';
-  document.getElementById('an-notas-egr').value = '';
-  document.getElementById('an-fecha-egr').value = todayISO();
-  cancelarEgreso();
-  actualizarContadorEgreso();
-  renderEgresosLote();
-  toast('🔄 Egreso reiniciado');
-}
-
-// Legacy — mantenido por compatibilidad
-function buscarAnimalEgreso() { validarCaravanaEgreso(); }
-function resetAnimalEgr() { reiniciarEgreso(); }
-function egresarAnimal() { confirmarEgreso(); }
-
-function deleteAnimal(id) {
-  COL.animales().doc(id).delete().then(() => toast('🗑️ Animal eliminado'))
-    .catch(() => toast('❌ Error al eliminar.'));
-}
-
-function renderAnimales() {
-  // Datalists
-  const optsCampos = [...new Set(campos.map(c => c.nombre))].map(n => `<option value="${esc(n)}">`).join('');
-  const optsClientes = clientes.map(c => `<option value="${esc(c.nombre)}">`).join('');
-  const optsProv = proveedores.map(p => `<option value="${esc(p.nombre)}">`).join('');
-  const dlC = document.getElementById('lista-campos-an');     if (dlC) dlC.innerHTML = optsCampos;
-  const dlCl = document.getElementById('lista-clientes-an');  if (dlCl) dlCl.innerHTML = optsClientes;
-  const dlP = document.getElementById('lista-proveedores-an'); if (dlP) dlP.innerHTML = optsProv;
-
-  // KPIs (solo Engorde)
-  const engAll      = animales.filter(a => a.categoria === 'Hacienda Engorde');
-  const enStock     = engAll.filter(a => a.estado === 'En stock');
-  const egresados   = engAll.filter(a => a.estado === 'Egresado').length;
-  const pesoTotal   = enStock.reduce((s, a) => s + (parseFloat(a.pesoIngreso)||0), 0);
-  const pesoProm    = enStock.length ? Math.round(pesoTotal / enStock.length) : 0;
-
-  const kpisEl = document.getElementById('animales-kpis');
-  if (kpisEl) {
-    kpisEl.innerHTML = `
-      <div style="background:var(--amber-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--amber);text-transform:uppercase">🐄 En stock</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#92400e;margin-top:.2rem">${enStock.length}</div>
-      </div>
-      <div style="background:var(--green-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase">Peso total</div>
-        <div style="font-size:1.4rem;font-weight:800;color:var(--green-dark);margin-top:.2rem">${fmtNum(Math.round(pesoTotal))} kg</div>
-      </div>
-      <div style="background:#dbeafe;border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:#1e40af;text-transform:uppercase">Peso prom.</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#1e3a8a;margin-top:.2rem">${pesoProm ? fmtNum(pesoProm)+' kg' : '—'}</div>
-      </div>
-      <div style="background:var(--gray-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase">Egresados</div>
-        <div style="font-size:1.4rem;font-weight:800;color:var(--gray-dark);margin-top:.2rem">${egresados}</div>
-      </div>
-    `;
-  }
-
-  // Tabla
-  const q     = (document.getElementById('an-search')?.value || '').toLowerCase();
-  const fCat  = document.getElementById('an-filter-categoria')?.value || '';
-  const fEst  = document.getElementById('an-filter-estado')?.value || '';
-
-  const rows = animales.filter(a => {
-    if (a.categoria !== 'Hacienda Engorde') return false; // solo Engorde en esta página
-    const m = !q || [a.caravana,a.campo,a.cliente,a.proveedor,a.notas].some(v => String(v||'').toLowerCase().includes(q));
-    return m && (!fEst || a.estado === fEst);
-  }).sort((a,b) => (b.fechaIngreso||'').localeCompare(a.fechaIngreso||''));
-
-  const tbody = document.getElementById('tabla-animales');
-  if (!tbody) return;
-  if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="11" class="empty-msg">No hay animales cargados.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map(a => {
-    const total = (parseFloat(a.pesoEgreso)||0) * (parseFloat(a.precio)||0);
-    const icono = a.categoria === 'Hacienda Engorde' ? '🐄' : '🐂';
-    const badge = a.estado === 'En stock' ? 'b-green' : 'b-gray';
-    return `
-    <tr>
-      <td><strong>${esc(a.caravana||'')}</strong></td>
-      <td>${icono} ${esc((a.categoria||'').replace('Hacienda ',''))}</td>
-      <td><span class="badge b-green">📍 ${esc(a.campo||'')}</span></td>
-      <td>${a.fechaIngreso ? fmtDate(a.fechaIngreso) : '—'}</td>
-      <td>${a.pesoIngreso ? fmtNum(a.pesoIngreso)+' kg' : '—'}</td>
-      <td>${a.pesoEgreso ? fmtNum(a.pesoEgreso)+' kg' : '—'}</td>
-      <td>${a.fechaEgreso ? fmtDate(a.fechaEgreso) : '—'}</td>
-      <td>${esc(a.cliente||'—')}</td>
-      <td>${total ? '$'+fmtNum(Math.round(total)) : '—'}</td>
-      <td><span class="badge ${badge}">${esc(a.estado||'')}</span></td>
-      <td><button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteAnimal('${a.id}'))">🗑️</button></td>
-    </tr>`;
-  }).join('');
-}
-
-function exportAnimalesCSV() {
-  if (!animales.length) { toast('No hay animales para exportar'); return; }
-  const cols = ['Caravana','Categoría','Campo','Fecha ingreso','Peso ingreso kg','Fecha egreso','Peso egreso kg','Cliente','Precio $/kg','Total $','Estado','Proveedor','Notas'];
-  const data = animales.map(a => {
-    const total = (parseFloat(a.pesoEgreso)||0) * (parseFloat(a.precio)||0);
-    return [a.caravana,a.categoria,a.campo,a.fechaIngreso,a.pesoIngreso,a.fechaEgreso,a.pesoEgreso,a.cliente,a.precio,total,a.estado,a.proveedor,a.notas]
-      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',');
-  });
-  downloadCSV([cols.join(','), ...data].join('\r\n'), `animales_blenda_${todayISO()}.csv`);
-  toast('📄 CSV exportado');
-}
-
-// ═══════════════════════════════════════════
 //  RENDER ALL
 // ═══════════════════════════════════════════
 
@@ -3576,8 +2251,6 @@ function renderAll() {
   renderClientes();
   renderCampos();
   renderProveedores();
-  renderSiembras();
-  renderAnimales();
   renderNotas();
   actualizarValorizacion();
 }
@@ -3964,65 +2637,33 @@ function parsePrecioAR(txt) {
   return parseFloat((txt || '').replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
 }
 
-const PRECIOS_MANUAL_KEY = 'blenda_precios_manual_v1';
-const PRECIOS_CACHE_KEY  = 'blenda_precios_cache_v1';
-
-function getPreciosManuales() {
-  try { return JSON.parse(localStorage.getItem(PRECIOS_MANUAL_KEY) || '{}'); } catch(e) { return {}; }
-}
-function setPrecioManual(producto, valor) {
-  const m = getPreciosManuales();
-  m[producto] = parseFloat(valor) || 0;
-  localStorage.setItem(PRECIOS_MANUAL_KEY, JSON.stringify(m));
-  // Aplicar inmediatamente
-  if (m[producto] > 0) {
-    preciosCot[producto] = { ars: m[producto], usd: null, label: producto, fuente: 'Manual' };
-  }
-  actualizarValorizacion();
-  renderDashStockCards();
-  cargarCotizaciones();
-}
-
 async function cargarCotizaciones() {
   const grid = document.getElementById('cotizaciones-grid');
   if (!grid) return;
   grid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⏳ Cargando precios pizarra…</div>`;
 
   // ── Intentar BCR (Cámara Arbitral de Cereales de Rosario) ──
-  let fuenteUsada = '';
-  let mercadoCerrado = false;
-  let precios = {};
   try {
     const resBCR = await fetch('https://api.codetabs.com/v1/proxy/?quest=https://www.cac.bcr.com.ar/es/precios-de-pizarra');
     if (!resBCR.ok) throw new Error('BCR no disponible');
     const html = await resBCR.text();
     const doc  = new DOMParser().parseFromString(html, 'text/html');
 
-    // Detectar si BCR avisa que no hay datos del día (fin de semana / feriado)
-    if (/no se han podido recuperar los datos|mercado cerrado/i.test(html)) {
-      mercadoCerrado = true;
-    }
-
-    // Probar varios selectores (estructura BCR cambia con el tiempo)
-    const selectores = ['.board', '.board-prices .board', '.board-prices', '.precios-board', '.price-board'];
-    for (const sel of selectores) {
-      doc.querySelectorAll(sel).forEach(board => {
-        const h3  = board.querySelector('h3, h4, .title, .producto');
-        const priceEl = board.querySelector('.price, .precio, .valor');
-        if (!h3 || !priceEl) return;
-        const nombre = h3.textContent.trim().toLowerCase()
-          .normalize('NFD').replace(/[̀-ͯ]/g, '');
-        const ars = parsePrecioAR(priceEl.textContent);
-        if (!ars) return;
-        if (nombre.includes('soja'))              precios['Soja']  = ars;
-        else if (nombre.includes('maiz') || nombre.includes('maíz')) precios['Maíz']  = ars;
-        else if (nombre.includes('trigo'))         precios['Trigo'] = ars;
-      });
-      if (Object.keys(precios).length) break;
-    }
+    const precios = {};
+    doc.querySelectorAll('.board').forEach(board => {
+      const h3  = board.querySelector('h3');
+      const priceEl = board.querySelector('.price');
+      if (!h3 || !priceEl) return;
+      const nombre = h3.textContent.trim().toLowerCase()
+        .normalize('NFD').replace(/[̀-ͯ]/g, '');   // quita tildes
+      const ars = parsePrecioAR(priceEl.textContent);
+      if (!ars) return;
+      if (nombre.includes('soja'))              precios['Soja']  = ars;
+      else if (nombre.includes('maiz') || nombre.includes('maíz')) precios['Maíz']  = ars;
+      else if (nombre.includes('trigo'))         precios['Trigo'] = ars;
+    });
 
     if (!Object.keys(precios).length) throw new Error('Sin precios parseados');
-    fuenteUsada = 'Pizarra Rosario BCR';
 
     // Tipo de cambio (para mostrar referencia USD)
     let usdARS = null;
@@ -4055,192 +2696,65 @@ async function cargarCotizaciones() {
         <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
         <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
       </div>
-    `).join('') + renderEditorPreciosManual() + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 Fuente: ${fuenteUsada} · 🕐 ${hora}</div>`;
-
-    // Cachear los precios para próximas cargas (si el mercado cierra)
-    try { localStorage.setItem(PRECIOS_CACHE_KEY, JSON.stringify({ precios, fecha: new Date().toISOString() })); } catch(e) {}
+    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 Fuente: Pizarra Rosario BCR · dolarapi.com<br>🕐 ${hora}</div>`;
 
     actualizarValorizacion();
     return; // éxito — salir
 
   } catch(eBCR) {
-    console.warn('BCR falló:', eBCR.message);
+    console.warn('BCR falló, usando Yahoo Finance como respaldo:', eBCR.message);
   }
 
-  // ── Fallback 1: Yahoo Finance (CBOT) — funciona aunque BCR esté caído ──
+  // ── Fallback: Yahoo Finance (CBOT) ──
   try {
-    let usdARS = 1;
-    try {
-      const resD = await fetch('https://dolarapi.com/v1/dolares/oficial');
-      const dD = await resD.json();
-      usdARS = dD.venta || 1;
-    } catch(e) {}
+    const resDolar = await fetch('https://dolarapi.com/v1/dolares/oficial');
+    const dolarData = await resDolar.json();
+    const usdARS = dolarData.venta || 1;
 
     const granos = [
       { key:'Soja',  ticker:'ZS=F', bpt:36.7437 },
       { key:'Maíz',  ticker:'ZC=F', bpt:39.3683 },
       { key:'Trigo', ticker:'ZW=F', bpt:36.7437 },
     ];
-    const preciosYF = {};
-    // Probamos directo y con proxy si CORS falla
+    const precios = {};
     await Promise.all(granos.map(async g => {
-      const urls = [
-        `https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`,
-        `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`)}`,
-      ];
-      for (const u of urls) {
-        try {
-          const r = await fetch(u);
-          if (!r.ok) continue;
-          const d = await r.json();
-          const pUSD = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          if (pUSD) {
-            preciosYF[g.key] = (pUSD / g.bpt) * usdARS;
-            return;
-          }
-        } catch(e) {}
-      }
+      try {
+        const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`);
+        const d = await r.json();
+        const pUSD = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+        if (pUSD) precios[g.key] = { usd: pUSD/g.bpt, ars: (pUSD/g.bpt)*usdARS, label: g.key };
+      } catch(e) {}
     }));
 
-    if (Object.keys(preciosYF).length) {
-      // Aplicar overrides manuales
-      const manuales = getPreciosManuales();
-      preciosCot = {};
-      Object.entries(preciosYF).forEach(([k, ars]) => {
-        preciosCot[k] = { ars: manuales[k] > 0 ? manuales[k] : ars, usd: ars / usdARS, label: k, fuente: manuales[k] > 0 ? 'Manual' : 'CBOT' };
-      });
-      Object.entries(manuales).forEach(([k, ars]) => {
-        if (ars > 0 && !preciosCot[k]) preciosCot[k] = { ars, usd: null, label: k, fuente: 'Manual' };
-      });
-
-      const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-      const items = [
-        { label:'💵 Dólar oficial', valor:`$${fmtNum(Math.round(usdARS))}`, sub:'BNA · por USD' },
-        ...Object.entries(preciosCot).map(([k, v]) => ({
-          label: `${ICONOS[k]||''} ${k}`,
-          valor: `$${fmtNum(Math.round(v.ars))}/tn`,
-          sub:   v.fuente === 'Manual' ? '✏️ Manual' : `≈ USD ${fmtNum(Math.round(v.usd))} · CBOT`,
-        })),
-      ];
-      grid.innerHTML =
-        `<div style="grid-column:1/-1;background:#fef3c7;border:1.5px solid #fbbf24;color:#78350f;padding:.55rem .85rem;border-radius:8px;font-size:.78rem;margin-bottom:.5rem">⚠️ BCR Rosario sin datos hoy${mercadoCerrado?' (mercado cerrado)':''} — usando referencia CBOT × dólar oficial.</div>` +
-        items.map(it => `
-          <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
-            <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
-            <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
-            <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
-          </div>
-        `).join('') + renderEditorPreciosManual() +
-        `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 Yahoo Finance CBOT × dolarapi · 🕐 ${hora}</div>`;
-      actualizarValorizacion();
-      return;
-    }
-  } catch(eYF) { console.warn('Yahoo falló:', eYF.message); }
-
-  // ── Fallback 2: usar último cache local (si el mercado está cerrado) ──
-  try {
-    const cache = JSON.parse(localStorage.getItem(PRECIOS_CACHE_KEY) || 'null');
-    if (cache && cache.precios && Object.keys(cache.precios).length) {
-      const fechaCache = new Date(cache.fecha);
-      const dias = Math.floor((Date.now() - fechaCache.getTime()) / 86400000);
-      preciosCot = {};
-      // Aplicar overrides manuales si existen
-      const manuales = getPreciosManuales();
-      Object.entries(cache.precios).forEach(([k, ars]) => {
-        preciosCot[k] = { ars: manuales[k] > 0 ? manuales[k] : ars, usd: null, label: k, fuente: manuales[k] > 0 ? 'Manual' : 'Última pizarra' };
-      });
-      // Agregar productos que solo tienen valor manual
-      Object.entries(manuales).forEach(([k, ars]) => {
-        if (ars > 0 && !preciosCot[k]) preciosCot[k] = { ars, usd: null, label: k, fuente: 'Manual' };
-      });
-
-      const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-      const fechaTxt = fechaCache.toLocaleDateString('es-AR');
-      const items = Object.entries(preciosCot).map(([k, v]) => ({
-        label: `${ICONOS[k]||''} ${k}`,
-        valor: `$${fmtNum(Math.round(v.ars))}/tn`,
-        sub:   v.fuente === 'Manual' ? '✏️ Manual' : `Último: ${fechaTxt}`,
-      }));
-      const aviso = mercadoCerrado
-        ? '⚠️ <strong>Mercado cerrado</strong> (sábado, domingo o feriado) — mostrando último precio de pizarra.'
-        : `⚠️ No se pudieron actualizar los precios online — usando último cache del ${fechaTxt}.`;
-      grid.innerHTML =
-        `<div style="grid-column:1/-1;background:#fef3c7;border:1.5px solid #fbbf24;color:#78350f;padding:.6rem .85rem;border-radius:8px;font-size:.78rem;margin-bottom:.5rem">${aviso}</div>` +
-        items.map(it => `
-          <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
-            <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
-            <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
-            <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
-          </div>
-        `).join('') + renderEditorPreciosManual();
-      actualizarValorizacion();
-      return;
-    }
-  } catch(e) { console.warn('Cache falló:', e.message); }
-
-  // ── Fallback 2: solo precios manuales si existen ──
-  const manuales = getPreciosManuales();
-  if (Object.keys(manuales).filter(k => manuales[k] > 0).length > 0) {
-    preciosCot = {};
-    Object.entries(manuales).forEach(([k, ars]) => {
-      if (ars > 0) preciosCot[k] = { ars, usd: null, label: k, fuente: 'Manual' };
-    });
-    grid.innerHTML =
-      `<div style="grid-column:1/-1;background:#fef3c7;border:1.5px solid #fbbf24;color:#78350f;padding:.6rem .85rem;border-radius:8px;font-size:.78rem;margin-bottom:.5rem">⚠️ Sin conexión a BCR. Usando solo precios manuales.</div>` +
-      Object.entries(preciosCot).map(([k, v]) => `
-        <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
-          <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${ICONOS[k]||''} ${k}</div>
-          <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">$${fmtNum(Math.round(v.ars))}/tn</div>
-          <div style="font-size:.68rem;color:var(--gray)">✏️ Manual</div>
-        </div>
-      `).join('') + renderEditorPreciosManual();
-    actualizarValorizacion();
-    return;
-  }
-
-  // ── Sin precios disponibles ──
-  grid.innerHTML =
-    `<div style="grid-column:1/-1;background:#fee2e2;border:1.5px solid #f87171;color:#7f1d1d;padding:.75rem 1rem;border-radius:8px;font-size:.85rem;margin-bottom:.5rem">⚠️ No se pudieron cargar precios. Cargalos manualmente abajo y la app sigue funcionando normal.</div>` +
-    renderEditorPreciosManual();
-}
-
-// Renderiza editor manual de precios (siempre visible al final del grid)
-function renderEditorPreciosManual() {
-  const m = getPreciosManuales();
-  return `
-    <div style="grid-column:1/-1;margin-top:.6rem;border-top:1px dashed var(--border);padding-top:.6rem">
-      <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.5rem">✏️ Cargar precio manual ($/tn) — sobreescribe la pizarra</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem">
-        ${GRANOS.map(p => `
-          <div style="display:flex;flex-direction:column;gap:.2rem">
-            <label style="font-size:.72rem;font-weight:600;color:#4b5563">${ICONOS[p]||''} ${p}</label>
-            <div style="display:flex;align-items:center;gap:.3rem">
-              <span style="font-size:.8rem;color:var(--gray)">$</span>
-              <input type="number" min="0" step="any" value="${m[p]||''}" placeholder="0"
-                style="width:100%;padding:.35rem .5rem;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem;background:#fff"
-                onchange="setPrecioManual('${p}', this.value)" />
-              <span style="font-size:.72rem;color:var(--gray);white-space:nowrap">/tn</span>
-            </div>
-          </div>
-        `).join('')}
+    preciosCot = precios;
+    const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    const items = [
+      { label:'💵 Dólar oficial', valor:`$${fmtNum(Math.round(usdARS))}`, sub:'por USD' },
+      ...Object.values(precios).map(p => ({
+        label: `${ICONOS[p.label]||''} ${p.label}`,
+        valor: `$${fmtNum(Math.round(p.ars))}/tn`,
+        sub:   `≈ USD ${fmtNum(Math.round(p.usd))} · CBOT`,
+      })),
+    ];
+    grid.innerHTML = items.map(it => `
+      <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
+        <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
+        <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
+        <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
       </div>
-    </div>`;
+    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">⚠️ Respaldo CBOT · 🕐 ${hora}</div>`;
+    actualizarValorizacion();
+
+  } catch(e) {
+    grid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⚠️ No se pudieron cargar las cotizaciones. Revisá la conexión.</div>`;
+  }
 }
 
 const GRANOS = ['Maíz','Soja','Trigo'];
 const HACIENDA = ['Hacienda Engorde','Hacienda Recría'];
 
-// Peso promedio kg/cabeza para hacienda
-// Engorde → promedio real de los animales individuales en stock
-// Recría  → promedio ponderado de los ingresos colectivos con pesoProm cargado
+// Promedio ponderado de kg/cabeza para hacienda (usa los ingresos que tienen pesoProm cargado)
 function calcPesoPromHacienda(producto) {
-  if (producto === 'Hacienda Engorde') {
-    const enStock = animales.filter(a => a.categoria === 'Hacienda Engorde' && a.estado === 'En stock' && (parseFloat(a.pesoIngreso)||0) > 0);
-    if (!enStock.length) return null;
-    const sum = enStock.reduce((s, a) => s + parseFloat(a.pesoIngreso), 0);
-    return sum / enStock.length;
-  }
-  // Recría (colectivo)
   let sumKg = 0, sumCant = 0;
   ingresos.forEach(i => {
     if (i.producto !== producto) return;
