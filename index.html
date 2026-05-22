@@ -2867,13 +2867,47 @@ function umbralOtsu(histograma, totalPx) {
   return umbral;
 }
 
-// Preprocesa: escala + gris + contraste + binarización automática (Otsu).
-// Devuelve { normal, invertida } — probamos ambas y nos quedamos con la mejor.
+// Threshold adaptativo: divide la imagen en bloques, calcula Otsu local en cada bloque.
+// Maneja sombras y luz desigual mucho mejor que un threshold global.
+function binarizadoAdaptativo(grises, w, h, bloques = 6) {
+  const bin = new Uint8ClampedArray(w * h);
+  const blkW = Math.ceil(w / bloques);
+  const blkH = Math.ceil(h / bloques);
+  // Calcular umbral por bloque
+  const umbrales = [];
+  for (let by = 0; by < bloques; by++) {
+    umbrales.push([]);
+    for (let bx = 0; bx < bloques; bx++) {
+      const x0 = bx * blkW, y0 = by * blkH;
+      const x1 = Math.min(x0 + blkW, w), y1 = Math.min(y0 + blkH, h);
+      const histo = new Array(256).fill(0);
+      let cnt = 0;
+      for (let y = y0; y < y1; y++) {
+        for (let x = x0; x < x1; x++) {
+          histo[grises[y*w + x]]++;
+          cnt++;
+        }
+      }
+      umbrales[by].push(umbralOtsu(histo, cnt));
+    }
+  }
+  // Aplicar (interpolando entre bloques para evitar bordes duros)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const bx = Math.min(Math.floor(x / blkW), bloques - 1);
+      const by = Math.min(Math.floor(y / blkH), bloques - 1);
+      bin[y*w + x] = grises[y*w + x] > umbrales[by][bx] ? 255 : 0;
+    }
+  }
+  return bin;
+}
+
+// Preprocesa: escala, gris, threshold adaptativo. Devuelve { normal, invertida }.
 async function preprocesarImagen(file) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
-      const maxLado = 1600;
+      const maxLado = 1800;
       const escala = Math.min(maxLado / Math.max(img.width, img.height), 4);
       const w = Math.round(img.width * escala);
       const h = Math.round(img.height * escala);
@@ -2884,35 +2918,27 @@ async function preprocesarImagen(file) {
       const data = ctx.getImageData(0, 0, w, h);
       const px = data.data;
 
-      // Convertir a gris + histograma
-      const histo = new Array(256).fill(0);
-      for (let i = 0; i < px.length; i += 4) {
-        const g = Math.round(0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]);
-        px[i] = px[i+1] = px[i+2] = g;
-        histo[g]++;
-      }
-      const umbral = umbralOtsu(histo, w * h);
-
-      // Binarización Otsu (negro/blanco)
-      const bin = new Uint8ClampedArray(px.length);
-      for (let i = 0; i < px.length; i += 4) {
-        const v = px[i] > umbral ? 255 : 0;
-        bin[i] = bin[i+1] = bin[i+2] = v;
-        bin[i+3] = 255;
-      }
-      // Versión invertida (por si la caravana tiene texto claro sobre fondo oscuro)
-      const inv = new Uint8ClampedArray(px.length);
-      for (let i = 0; i < px.length; i += 4) {
-        const v = 255 - bin[i];
-        inv[i] = inv[i+1] = inv[i+2] = v;
-        inv[i+3] = 255;
+      // A escala de grises
+      const grises = new Uint8ClampedArray(w * h);
+      for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+        grises[j] = Math.round(0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2]);
       }
 
-      // Convertir a blobs
+      // Binarizado adaptativo (maneja sombras)
+      const bin = binarizadoAdaptativo(grises, w, h, 8);
+
+      // Volcamos al canvas en RGBA
+      const out = new Uint8ClampedArray(px.length);
+      const outInv = new Uint8ClampedArray(px.length);
+      for (let i = 0, j = 0; i < px.length; i += 4, j++) {
+        out[i] = out[i+1] = out[i+2] = bin[j];        out[i+3] = 255;
+        outInv[i] = outInv[i+1] = outInv[i+2] = 255 - bin[j]; outInv[i+3] = 255;
+      }
+
       const c1 = document.createElement('canvas'); c1.width = w; c1.height = h;
-      c1.getContext('2d').putImageData(new ImageData(bin, w, h), 0, 0);
+      c1.getContext('2d').putImageData(new ImageData(out, w, h), 0, 0);
       const c2 = document.createElement('canvas'); c2.width = w; c2.height = h;
-      c2.getContext('2d').putImageData(new ImageData(inv, w, h), 0, 0);
+      c2.getContext('2d').putImageData(new ImageData(outInv, w, h), 0, 0);
 
       Promise.all([
         new Promise(r => c1.toBlob(r, 'image/jpeg', 0.95)),
@@ -2959,7 +2985,7 @@ async function procesarFotoOCR(file, tipo) {
       { img: normal,    psm: '7' },
       { img: invertida, psm: '7' },
       { img: normal,    psm: '6' },
-      { img: invertida, psm: '8' },
+      { img: invertida, psm: '6' },
       { img: normal,    psm: '11' },
     ];
 
@@ -2970,40 +2996,55 @@ async function procesarFotoOCR(file, tipo) {
       statusEl.innerHTML = `⏳ Intento ${i}/${intentos.length}…`;
       try {
         const result = await Tesseract.recognize(cfg.img, 'eng', {
-          tessedit_char_whitelist: '0123456789',
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
           tessedit_pageseg_mode: cfg.psm,
-          preserve_interword_spaces: '0',
+          preserve_interword_spaces: '1',
         });
-        const text = (result.data.text || '').replace(/[^\d\s]/g, ' ').replace(/\s+/g, ' ').trim();
-        const matches = text.match(/\d{3,}/g) || [];
         const conf = result.data.confidence || 0;
-        matches.forEach(m => candidatos.push({ valor: m, conf, psm: cfg.psm }));
+        // Limpiar: dejar solo alfanumérico + espacios, en MAYÚSCULAS
+        const text = (result.data.text || '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+        // Patrones de caravana:
+        //  (1) Letras + dígitos juntos o separados por espacio: "SLT 356", "ABC123"
+        //  (2) Solo dígitos largos: "12345"
+        const patrones = [
+          /([A-Z]{1,4})\s?(\d{2,6})/g,   // letras + número
+          /(\d{3,7})/g,                   // solo números largos
+        ];
+
+        for (const re of patrones) {
+          let m;
+          while ((m = re.exec(text)) !== null) {
+            const valor = m[1] && m[2] ? (m[1] + ' ' + m[2]) : m[0];
+            candidatos.push({ valor: valor.trim(), conf, psm: cfg.psm });
+          }
+        }
       } catch(e) { /* ignorar este intento */ }
     }
 
     if (candidatos.length) {
-      // Agrupar por valor y sumar confianza (más veces detectado = mejor)
+      // Agrupar por valor y rankear
       const score = {};
       candidatos.forEach(c => {
         if (!score[c.valor]) score[c.valor] = { veces: 0, confTotal: 0 };
         score[c.valor].veces++;
         score[c.valor].confTotal += c.conf;
       });
-      // Ordenar por: cantidad de veces detectado × longitud × confianza
       const ranking = Object.entries(score).map(([valor, s]) => ({
         valor,
-        peso: s.veces * valor.length * 100 + s.confTotal,
+        // Patrones con letras+números pesan más (es lo más típico en caravanas)
+        peso: s.veces * (valor.includes(' ') ? 200 : 100) * valor.length + s.confTotal,
       })).sort((a,b) => b.peso - a.peso);
 
       const mejor = ranking[0].valor;
       const otros = ranking.slice(1, 4).map(r => r.valor);
       inputEl.value = mejor;
       statusEl.innerHTML = `✅ Detectado: <strong style="font-size:1rem">${mejor}</strong>` +
-        (otros.length ? ` <small style="color:var(--gray)">· otros candidatos: ${otros.join(', ')}</small>` : '') +
+        (otros.length ? ` <small style="color:var(--gray)">· otros: ${otros.join(', ')}</small>` : '') +
         ` <small style="color:var(--gray)">— corregilo si no es correcto</small>`;
       if (tipo === 'egr') buscarAnimalEgreso();
     } else {
-      statusEl.innerHTML = `⚠️ No se detectó número. <small style="color:var(--gray)">Tips: acercate más, buena luz, caravana derecha. O cargalo a mano.</small>`;
+      statusEl.innerHTML = `⚠️ No se detectó caravana. <small style="color:var(--gray)">Tips: acercate más, buena luz directa (sin sombras), caravana derecha. O cargalo a mano.</small>`;
     }
   } catch (e) {
     console.warn('OCR error:', e);
