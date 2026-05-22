@@ -2793,10 +2793,18 @@ async function abrirCamara(tipo) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error('Sin soporte de cámara en este navegador');
     }
-    // Intenta cámara trasera; si falla, cae a cualquier cámara
+    // Pedir cámara trasera en alta resolución
+    const constraints = {
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 },
+      },
+      audio: false,
+    };
     let stream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
     } catch(e) {
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
     }
@@ -2822,17 +2830,68 @@ function cerrarCamara(tipo) {
   document.getElementById(`cam-controls-${tipo}`).style.display = '';
 }
 
-function capturarFoto(tipo) {
+async function capturarFoto(tipo) {
+  const stream = camStreams[tipo];
   const video  = document.getElementById(`cam-video-${tipo}`);
   const canvas = document.getElementById(`cam-canvas-${tipo}`);
-  if (!video.videoWidth) { toast('⚠️ La cámara no está lista aún'); return; }
+  if (!stream && (!video || !video.videoWidth)) { toast('⚠️ La cámara no está lista aún'); return; }
+
+  // Intentar ImageCapture (foto a resolución real del sensor)
+  try {
+    if ('ImageCapture' in window && stream) {
+      const track = stream.getVideoTracks()[0];
+      const imageCapture = new ImageCapture(track);
+      const blob = await imageCapture.takePhoto();
+      cerrarCamara(tipo);
+      if (blob) procesarFotoOCR(blob, tipo);
+      return;
+    }
+  } catch(e) {
+    console.warn('ImageCapture falló, uso canvas:', e);
+  }
+
+  // Fallback: capturar frame del video con canvas
+  if (!video.videoWidth) { toast('⚠️ Cámara no lista'); return; }
   canvas.width  = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext('2d').drawImage(video, 0, 0);
   canvas.toBlob(blob => {
     cerrarCamara(tipo);
     if (blob) procesarFotoOCR(blob, tipo);
-  }, 'image/jpeg', 0.9);
+  }, 'image/jpeg', 0.95);
+}
+
+// Preprocesa la imagen: escala, gris y contraste — mejora mucho la lectura OCR
+async function preprocesarImagen(file) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      // Si la imagen es chica, escalar hasta ~1200px de lado largo
+      const maxLado = 1400;
+      const escala = Math.min(maxLado / Math.max(img.width, img.height), 3);
+      const w = Math.round(img.width * escala);
+      const h = Math.round(img.height * escala);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      // Convertir a gris + aumentar contraste
+      const data = ctx.getImageData(0, 0, w, h);
+      const px = data.data;
+      const factor = 1.6; // contraste
+      for (let i = 0; i < px.length; i += 4) {
+        const gris = 0.299*px[i] + 0.587*px[i+1] + 0.114*px[i+2];
+        let v = ((gris - 128) * factor) + 128;
+        v = Math.max(0, Math.min(255, v));
+        px[i] = px[i+1] = px[i+2] = v;
+      }
+      ctx.putImageData(data, 0, 0);
+      canvas.toBlob(b => resolve(b || file), 'image/jpeg', 0.95);
+    };
+    img.onerror = () => resolve(file);
+    img.src = URL.createObjectURL(file);
+  });
 }
 
 // Apagar cámaras al cambiar de página
@@ -2849,10 +2908,10 @@ async function procesarFotoOCR(file, tipo) {
   const previewEl = document.getElementById('an-preview-' + tipo);
   const inputEl   = document.getElementById('an-caravana-' + tipo);
 
-  // Mostrar preview
+  // Mostrar preview original
   previewEl.src = URL.createObjectURL(file);
   previewEl.style.display = 'block';
-  statusEl.innerHTML = '⏳ Leyendo caravana…';
+  statusEl.innerHTML = '⏳ Preparando imagen…';
 
   if (typeof Tesseract === 'undefined') {
     statusEl.innerHTML = '⚠️ OCR no disponible. Cargá el número manualmente.';
@@ -2860,25 +2919,34 @@ async function procesarFotoOCR(file, tipo) {
   }
 
   try {
-    const result = await Tesseract.recognize(file, 'eng', {
+    // Preprocesar: escalar + gris + contraste
+    const procesada = await preprocesarImagen(file);
+
+    statusEl.innerHTML = '⏳ Leyendo caravana…';
+    const result = await Tesseract.recognize(procesada, 'eng', {
       logger: m => {
         if (m.status === 'recognizing text') {
           statusEl.innerHTML = `⏳ Procesando ${Math.round(m.progress*100)}%`;
         }
       },
-      tessedit_char_whitelist: '0123456789'
+      tessedit_char_whitelist: '0123456789',
+      tessedit_pageseg_mode: '6', // bloque uniforme de texto
+      preserve_interword_spaces: '0',
     });
-    const text = (result.data.text || '').replace(/\s+/g, ' ');
-    // Buscar el grupo de dígitos más largo (3+ números seguidos)
+    const text = (result.data.text || '').replace(/[^\d\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    // Buscar todos los grupos de dígitos
     const matches = text.match(/\d{3,}/g) || [];
     if (matches.length) {
-      // Usar el más largo
+      // Usar el más largo (las caravanas suelen ser de 4-6 dígitos)
       const mejor = matches.sort((a,b) => b.length - a.length)[0];
       inputEl.value = mejor;
-      statusEl.innerHTML = `✅ Detectado: <strong>${mejor}</strong> (corrigelo si está mal)`;
+      const otros = matches.filter(m => m !== mejor);
+      statusEl.innerHTML = `✅ Detectado: <strong>${mejor}</strong>` +
+        (otros.length ? ` <small style="color:var(--gray)">(otros: ${otros.join(', ')})</small>` : '') +
+        ` — corrigelo si no es correcto`;
       if (tipo === 'egr') buscarAnimalEgreso();
     } else {
-      statusEl.innerHTML = '⚠️ No se detectó número claro. Cargalo a mano.';
+      statusEl.innerHTML = '⚠️ No se detectó número claro. Cargalo a mano (acercate más a la caravana y buena luz).';
     }
   } catch (e) {
     console.warn('OCR error:', e);
