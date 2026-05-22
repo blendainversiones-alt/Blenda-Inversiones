@@ -923,43 +923,52 @@
 <div class="page" id="page-animales">
   <div class="container">
 
+    <!-- Banner versión -->
+    <div style="background:linear-gradient(90deg,#10b981,#059669);color:#fff;padding:.6rem 1rem;border-radius:10px;margin-bottom:1rem;font-size:.85rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+      <span><strong>🆕 NUEVO FLUJO POR JAULA — v6</strong> · Cargá datos del camión una vez, luego escaneás caravanas</span>
+      <span id="ver-fecha" style="font-size:.7rem;opacity:.85"></span>
+    </div>
     <!-- KPIs -->
     <div class="card">
       <h2>🐄 Hacienda Engorde — Registro individual</h2>
-      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá cada animal de engorde con foto de la caravana (el N° se detecta automáticamente). Solo aplica a engorde — para recría usá el ingreso colectivo normal.</p>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargás los datos de la jaula que llega, después escaneás cada caravana con foto.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem" id="animales-kpis"></div>
     </div>
 
-    <!-- 1. Datos del lote -->
-    <div class="card">
-      <h2>📋 Datos del lote / jaula</h2>
-      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá una sola vez los datos comunes a todos los animales que vas a ingresar.</p>
+    <!-- 1. Datos del lote / jaula -->
+    <div class="card" style="border-left:4px solid var(--green)">
+      <h2>🚚 Datos de la jaula que llega</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargás una sola vez los datos del camión y la mercadería. Después escaneás las caravanas una por una.</p>
       <div class="form-grid">
         <div class="form-group">
-          <label for="an-campo-ing">Campo / Lote *</label>
+          <label for="an-patente-ing">🚛 Patente del camión</label>
+          <input id="an-patente-ing" type="text" placeholder="Ej: AB 123 CD" style="text-transform:uppercase" />
+        </div>
+        <div class="form-group">
+          <label for="an-fecha-ing">📅 Fecha ingreso *</label>
+          <input id="an-fecha-ing" type="date" required />
+        </div>
+        <div class="form-group">
+          <label for="an-cantidad-esp">🔢 Cantidad de animales *</label>
+          <input id="an-cantidad-esp" type="number" min="0" step="1" placeholder="Ej: 50" oninput="actualizarContadorLote()" required />
+        </div>
+        <div class="form-group">
+          <label for="an-peso-ing">⚖️ Peso aproximado (kg/cab) *</label>
+          <input id="an-peso-ing" type="number" min="0" step="any" placeholder="Ej: 380" required />
+        </div>
+        <div class="form-group">
+          <label for="an-campo-ing">📍 Campo / Destino *</label>
           <input id="an-campo-ing" type="text" placeholder="Ej: Campo Norte" list="lista-campos-an" required />
           <datalist id="lista-campos-an"></datalist>
         </div>
         <div class="form-group">
-          <label for="an-proveedor-ing">Proveedor (si es compra)</label>
+          <label for="an-proveedor-ing">🚚 Proveedor (si es compra)</label>
           <input id="an-proveedor-ing" type="text" placeholder="Nombre del proveedor" list="lista-proveedores-an" />
           <datalist id="lista-proveedores-an"></datalist>
         </div>
-        <div class="form-group">
-          <label for="an-fecha-ing">Fecha ingreso *</label>
-          <input id="an-fecha-ing" type="date" required />
-        </div>
-        <div class="form-group">
-          <label for="an-peso-ing">Peso promedio (kg/cab) *</label>
-          <input id="an-peso-ing" type="number" min="0" step="any" placeholder="Ej: 380" required />
-        </div>
-        <div class="form-group">
-          <label for="an-cantidad-esp">Cantidad esperada (cabezas)</label>
-          <input id="an-cantidad-esp" type="number" min="0" step="1" placeholder="Ej: 50" oninput="actualizarContadorLote()" />
-        </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label for="an-notas-ing">Notas del lote</label>
-          <textarea id="an-notas-ing" placeholder="Observaciones generales del lote…"></textarea>
+          <label for="an-notas-ing">📝 Notas del lote</label>
+          <textarea id="an-notas-ing" placeholder="Remito, observaciones generales…"></textarea>
         </div>
       </div>
       <div class="form-actions" style="justify-content:flex-end">
@@ -2810,6 +2819,11 @@ function exportSiembrasCSV() {
 //  ANIMALES (registro individual con OCR de caravana)
 // ═══════════════════════════════════════════
 
+// Declaración previa de variables del lote (deben existir antes de cualquier llamada)
+let loteActual = [];
+let loteIdActual = null;
+let egresosLote = [];
+
 // Inicializar fechas
 document.getElementById('an-fecha-ing').value = todayISO();
 document.getElementById('an-fecha-egr').value = todayISO();
@@ -3112,8 +3126,7 @@ async function procesarFotoOCR(file, tipo) {
 }
 
 // Lote actual: lista de IDs de animales cargados en esta sesión de carga
-let loteActual = [];   // [{ id, caravana }]
-let loteIdActual = null;  // identificador único del lote actual
+// (loteActual y loteIdActual declarados arriba antes de los init calls)
 
 function actualizarContadorLote() {
   const esperada = parseInt(document.getElementById('an-cantidad-esp').value) || 0;
@@ -3144,9 +3157,11 @@ function iniciarCapturaCaravana() {
   const campo = document.getElementById('an-campo-ing').value.trim();
   const fecha = document.getElementById('an-fecha-ing').value;
   const peso  = parseFloat(document.getElementById('an-peso-ing').value) || 0;
-  if (!campo) { toast('⚠️ Cargá el Campo del lote arriba'); return; }
-  if (!fecha) { toast('⚠️ Cargá la fecha del lote arriba'); return; }
-  if (!peso)  { toast('⚠️ Cargá el peso promedio del lote arriba'); return; }
+  const cant  = parseInt(document.getElementById('an-cantidad-esp').value) || 0;
+  if (!campo) { toast('⚠️ Cargá el Campo arriba'); return; }
+  if (!fecha) { toast('⚠️ Cargá la fecha del ingreso'); return; }
+  if (!cant)  { toast('⚠️ Cargá la cantidad de animales esperada'); return; }
+  if (!peso)  { toast('⚠️ Cargá el peso aproximado'); return; }
   // Asignar loteId si todavía no hay uno
   if (!loteIdActual) loteIdActual = 'lote_' + Date.now();
   // Abrir la cámara
@@ -3283,8 +3298,7 @@ function exportarSenasa() {
   toast(`📑 Reporte SENASA generado · ${enStock.length} caravanas`, '#14532d');
 }
 
-// Egreso en lote
-let egresosLote = []; // [{ id, caravana, prevState }]
+// Egreso en lote (egresosLote declarado arriba antes de los init calls)
 
 function actualizarContadorEgreso() {
   const esperada = parseInt(document.getElementById('an-cantidad-egr').value) || 0;
