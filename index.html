@@ -390,6 +390,7 @@
   <div class="tab" onclick="showPage('salidas', this)">📤 Egresos</div>
   <div class="tab" onclick="showPage('resumen', this)">📈 Resumen</div>
   <div class="tab" onclick="showPage('siembra', this)">🌱 Siembra</div>
+  <div class="tab" onclick="showPage('engorde', this)">🐄 Engorde</div>
   <div class="tab" onclick="showPage('tablas', this)">📋 Tablas</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
@@ -912,6 +913,133 @@
         <button type="submit" class="btn btn-primary">Guardar cambios</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ ENGORDE ═══════════════════════════════ -->
+<div class="page" id="page-engorde">
+  <div class="container">
+
+    <!-- KPIs -->
+    <div class="card">
+      <h2>🐄 Hacienda Engorde — Registro individual</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cada animal se registra con su N° de caravana. El stock de Engorde se calcula automáticamente desde estos registros.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem" id="engorde-kpis"></div>
+    </div>
+
+    <!-- Cargar ingreso individual -->
+    <div class="card" style="border-left:4px solid var(--green)">
+      <h2>📥 Ingresar animal</h2>
+      <form id="form-engorde-ing">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="eg-caravana">N° de caravana *</label>
+            <input id="eg-caravana" type="text" placeholder="Ej: 1234 o ABC 567" required />
+          </div>
+          <div class="form-group">
+            <label for="eg-peso">Peso ingreso (kg) *</label>
+            <input id="eg-peso" type="number" min="0" step="any" placeholder="Ej: 380" required />
+          </div>
+          <div class="form-group">
+            <label for="eg-campo">Campo / Lote *</label>
+            <input id="eg-campo" type="text" placeholder="Ej: Campo Norte" list="lista-campos-eg" required />
+            <datalist id="lista-campos-eg"></datalist>
+          </div>
+          <div class="form-group">
+            <label for="eg-proveedor">Proveedor (si es compra)</label>
+            <input id="eg-proveedor" type="text" placeholder="Nombre del proveedor" list="lista-proveedores-eg" />
+            <datalist id="lista-proveedores-eg"></datalist>
+          </div>
+          <div class="form-group">
+            <label for="eg-fecha-ing">Fecha ingreso</label>
+            <input id="eg-fecha-ing" type="date" />
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="eg-notas-ing">Notas</label>
+            <textarea id="eg-notas-ing" placeholder="Observaciones del animal…"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="resetEngordeIng()">Limpiar</button>
+          <button type="submit" class="btn btn-primary">Guardar animal</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Egresar animal -->
+    <div class="card" style="border-left:4px solid #7c3aed">
+      <h2>📤 Egresar animal</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Escribí el N° de caravana del animal que sale. Se valida que esté en stock antes de egresar.</p>
+      <form id="form-engorde-egr">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="eg-caravana-egr">N° de caravana *</label>
+            <input id="eg-caravana-egr" type="text" placeholder="Ej: 1234" oninput="buscarCaravanaEgreso()" required />
+            <div id="eg-match-egr" style="font-size:.78rem;margin-top:.3rem"></div>
+          </div>
+          <div class="form-group">
+            <label for="eg-peso-egr">Peso salida (kg)</label>
+            <input id="eg-peso-egr" type="number" min="0" step="any" placeholder="Ej: 460" />
+          </div>
+          <div class="form-group">
+            <label for="eg-precio-egr">Precio $/kg</label>
+            <input id="eg-precio-egr" type="number" min="0" step="any" placeholder="Ej: 4800" />
+          </div>
+          <div class="form-group">
+            <label for="eg-cliente-egr">Cliente</label>
+            <input id="eg-cliente-egr" type="text" placeholder="Cliente" list="lista-clientes-eg" />
+            <datalist id="lista-clientes-eg"></datalist>
+          </div>
+          <div class="form-group">
+            <label for="eg-fecha-egr">Fecha egreso</label>
+            <input id="eg-fecha-egr" type="date" />
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="eg-notas-egr">Notas del egreso</label>
+            <textarea id="eg-notas-egr" placeholder="Remito, observaciones…"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="resetEngordeEgr()">Limpiar</button>
+          <button type="submit" class="btn btn-primary" style="background:#7c3aed">📤 Egresar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Listado -->
+    <div class="card">
+      <h2>📋 Animales</h2>
+      <div class="toolbar">
+        <input id="eg-search" type="search" placeholder="Buscar caravana, campo, cliente…" oninput="renderEngorde()" />
+        <select id="eg-filter-estado" onchange="renderEngorde()" style="width:auto;min-width:140px">
+          <option value="">Todos</option>
+          <option value="En stock">En stock</option>
+          <option value="Egresado">Egresados</option>
+        </select>
+        <button class="btn btn-blue btn-sm" onclick="exportEngordeCSV()">Exportar CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="exportSenasa()" style="background:#0891b2">📑 Reporte SENASA</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Caravana</th>
+              <th>Campo</th>
+              <th>Ingreso</th>
+              <th>Peso ing.</th>
+              <th>Peso sal.</th>
+              <th>Egreso</th>
+              <th>Cliente</th>
+              <th>$ Total</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-engorde"></tbody>
+        </table>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1454,9 +1582,10 @@ let notas       = [];
 let campos      = [];
 let proveedores = [];
 let siembras    = [];
+let animales    = [];
 
 // Contadores para saber cuándo todos los listeners cargaron por primera vez
-let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false, siembras: false };
+let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false, siembras: false, animales: false };
 
 function checkLoaded() {
   return Object.values(_loaded).every(Boolean);
@@ -1505,6 +1634,12 @@ db.collection('siembras').onSnapshot(snap => {
   if (checkLoaded()) renderAll();
 });
 
+db.collection('animales').onSnapshot(snap => {
+  animales = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.animales = true;
+  if (checkLoaded()) renderAll();
+});
+
 // ── helpers Firestore ──
 const COL = {
   salidas:     () => db.collection('salidas'),
@@ -1514,6 +1649,7 @@ const COL = {
   campos:      () => db.collection('campos'),
   proveedores: () => db.collection('proveedores'),
   siembras:    () => db.collection('siembras'),
+  animales:    () => db.collection('animales'),
 };
 
 const PRODUCTOS = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría','Otro'];
@@ -1599,14 +1735,25 @@ function calcStock() {
   const stock = {};
   PRODUCTOS.forEach(p => stock[p] = 0);
 
+  // Granos y Recría desde ingresos - salidas (colectivo).
+  // Engorde se cuenta desde animales individuales (más abajo).
   ingresos.forEach(i => {
+    if (i.producto === 'Hacienda Engorde') return;
     if (stock[i.producto] !== undefined) stock[i.producto] += parseFloat(i.cantidad) || 0;
     else stock[i.producto] = parseFloat(i.cantidad) || 0;
   });
 
   salidas.forEach(s => {
+    if (s.producto === 'Hacienda Engorde') return;
     if (stock[s.producto] !== undefined) stock[s.producto] -= parseFloat(s.cantidad) || 0;
     else stock[s.producto] = -(parseFloat(s.cantidad) || 0);
+  });
+
+  // Engorde: 1 caravana en stock = 1 cabeza
+  (animales || []).forEach(a => {
+    if (a.estado === 'En stock' && a.categoria === 'Hacienda Engorde') {
+      stock['Hacienda Engorde']++;
+    }
   });
 
   return stock;
@@ -2582,6 +2729,248 @@ function exportSiembrasCSV() {
 }
 
 // ═══════════════════════════════════════════
+//  ENGORDE — registro individual con caravana
+// ═══════════════════════════════════════════
+
+// Fechas por defecto
+(function initFechasEngorde(){
+  const fi = document.getElementById('eg-fecha-ing');
+  const fe = document.getElementById('eg-fecha-egr');
+  if (fi) fi.value = todayISO();
+  if (fe) fe.value = todayISO();
+})();
+
+// ── Ingresar animal ──
+document.getElementById('form-engorde-ing').addEventListener('submit', async e => {
+  e.preventDefault();
+  const caravana  = document.getElementById('eg-caravana').value.trim();
+  const peso      = parseFloat(document.getElementById('eg-peso').value) || 0;
+  const campo     = document.getElementById('eg-campo').value.trim();
+  const proveedor = document.getElementById('eg-proveedor').value.trim();
+  const fecha     = document.getElementById('eg-fecha-ing').value;
+  const notas     = document.getElementById('eg-notas-ing').value.trim();
+
+  if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
+  if (!peso)     { toast('⚠️ Cargá el peso de ingreso'); return; }
+  if (!campo)    { toast('⚠️ Cargá el campo'); return; }
+
+  // Duplicado en stock
+  const dup = animales.find(a => (a.caravana||'').trim() === caravana && a.estado === 'En stock');
+  if (dup) {
+    if (!confirm(`Ya hay un animal con caravana "${caravana}" en stock. ¿Cargar otro igual?`)) return;
+  }
+
+  // Validar campo contra tabla
+  const okCampo = await validarYAgregarRef(campo, campos, 'Campos',
+    () => COL.campos().add({ nombre: campo, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
+  );
+  if (!okCampo) return;
+
+  // Validar proveedor si se cargó
+  if (proveedor) {
+    const okProv = await validarYAgregarRef(proveedor, proveedores, 'Proveedores',
+      () => COL.proveedores().add({ nombre: proveedor, cuit:'', tel:'', email:'', localidad:'', rubro:'', notas:'' })
+    );
+    if (!okProv) return;
+  }
+
+  const rec = {
+    caravana,
+    categoria: 'Hacienda Engorde',
+    pesoIngreso: peso,
+    campo,
+    proveedor,
+    fechaIngreso: fecha || todayISO(),
+    estado: 'En stock',
+    notas,
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  COL.animales().add(rec).then(() => {
+    // Limpiar solo caravana/peso/notas para carga rápida; mantener campo/fecha/proveedor
+    document.getElementById('eg-caravana').value = '';
+    document.getElementById('eg-peso').value = '';
+    document.getElementById('eg-notas-ing').value = '';
+    document.getElementById('eg-caravana').focus();
+    toast(`✅ ${caravana} cargado · stock actualizado`, '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+});
+
+function resetEngordeIng() {
+  document.getElementById('form-engorde-ing').reset();
+  document.getElementById('eg-fecha-ing').value = todayISO();
+}
+
+// ── Buscar caravana al escribir en egreso ──
+function buscarCaravanaEgreso() {
+  const car = document.getElementById('eg-caravana-egr').value.trim();
+  const info = document.getElementById('eg-match-egr');
+  if (!car) { info.innerHTML = ''; return; }
+  const a = animales.find(x => (x.caravana||'').trim() === car && x.estado === 'En stock');
+  if (a) {
+    info.innerHTML = `<span style="color:var(--green-dark);font-weight:600">✅ EN STOCK</span> · ingreso ${fmtDate(a.fechaIngreso)} · ${fmtNum(a.pesoIngreso)} kg · 📍 ${esc(a.campo)}`;
+  } else {
+    const ya = animales.find(x => (x.caravana||'').trim() === car && x.estado === 'Egresado');
+    if (ya) info.innerHTML = `<span style="color:var(--amber)">⚠️ YA EGRESADA</span> el ${fmtDate(ya.fechaEgreso)}`;
+    else    info.innerHTML = `<span style="color:var(--red);font-weight:600">❌ NO está en stock</span>`;
+  }
+}
+
+// ── Egresar animal ──
+document.getElementById('form-engorde-egr').addEventListener('submit', async e => {
+  e.preventDefault();
+  const car = document.getElementById('eg-caravana-egr').value.trim();
+  if (!car) { toast('⚠️ Cargá el N° de caravana'); return; }
+  const animal = animales.find(a => (a.caravana||'').trim() === car && a.estado === 'En stock');
+  if (!animal) { toast(`❌ La caravana ${car} no está en stock`); return; }
+
+  const peso    = parseFloat(document.getElementById('eg-peso-egr').value) || 0;
+  const precio  = parseFloat(document.getElementById('eg-precio-egr').value) || 0;
+  const cliente = document.getElementById('eg-cliente-egr').value.trim();
+  const fecha   = document.getElementById('eg-fecha-egr').value;
+  const notas   = document.getElementById('eg-notas-egr').value.trim();
+
+  if (cliente) {
+    const okCliente = await validarYAgregarRef(cliente, clientes, 'Clientes',
+      () => COL.clientes().add({ nombre: cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' })
+    );
+    if (!okCliente) return;
+  }
+
+  const data = {
+    estado: 'Egresado',
+    fechaEgreso: fecha || todayISO(),
+    pesoEgreso: peso,
+    precio,
+    cliente,
+    notasEgreso: notas,
+  };
+  COL.animales().doc(animal.id).update(data).then(() => {
+    document.getElementById('eg-caravana-egr').value = '';
+    document.getElementById('eg-peso-egr').value = '';
+    document.getElementById('eg-notas-egr').value = '';
+    document.getElementById('eg-match-egr').innerHTML = '';
+    document.getElementById('eg-caravana-egr').focus();
+    toast(`✅ ${car} egresada · stock actualizado`, '#14532d');
+  }).catch(() => toast('❌ Error al egresar.'));
+});
+
+function resetEngordeEgr() {
+  document.getElementById('form-engorde-egr').reset();
+  document.getElementById('eg-fecha-egr').value = todayISO();
+  document.getElementById('eg-match-egr').innerHTML = '';
+}
+
+function deleteEngorde(id) {
+  COL.animales().doc(id).delete().then(() => toast('🗑️ Registro eliminado'))
+    .catch(() => toast('❌ Error al eliminar.'));
+}
+
+function renderEngorde() {
+  // Datalists
+  const optsCampos   = [...new Set(campos.map(c => c.nombre))].map(n => `<option value="${esc(n)}">`).join('');
+  const optsProv     = proveedores.map(p => `<option value="${esc(p.nombre)}">`).join('');
+  const optsCliente  = clientes.map(c => `<option value="${esc(c.nombre)}">`).join('');
+  const dlC = document.getElementById('lista-campos-eg');     if (dlC) dlC.innerHTML = optsCampos;
+  const dlP = document.getElementById('lista-proveedores-eg'); if (dlP) dlP.innerHTML = optsProv;
+  const dlL = document.getElementById('lista-clientes-eg');   if (dlL) dlL.innerHTML = optsCliente;
+
+  // KPIs (solo Engorde)
+  const engorde = animales.filter(a => a.categoria === 'Hacienda Engorde');
+  const enStock = engorde.filter(a => a.estado === 'En stock');
+  const egresados = engorde.filter(a => a.estado === 'Egresado').length;
+  const pesoTotal = enStock.reduce((s, a) => s + (parseFloat(a.pesoIngreso)||0), 0);
+  const pesoProm  = enStock.length ? Math.round(pesoTotal / enStock.length) : 0;
+
+  const kpisEl = document.getElementById('engorde-kpis');
+  if (kpisEl) {
+    kpisEl.innerHTML = `
+      <div style="background:var(--amber-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--amber);text-transform:uppercase">🐄 En stock</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#92400e;margin-top:.2rem">${enStock.length}</div>
+      </div>
+      <div style="background:var(--green-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase">Peso total</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--green-dark);margin-top:.2rem">${fmtNum(Math.round(pesoTotal))} kg</div>
+      </div>
+      <div style="background:#dbeafe;border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:#1e40af;text-transform:uppercase">Peso prom.</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#1e3a8a;margin-top:.2rem">${pesoProm ? fmtNum(pesoProm)+' kg' : '—'}</div>
+      </div>
+      <div style="background:var(--gray-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase">Egresados</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--gray-dark);margin-top:.2rem">${egresados}</div>
+      </div>
+    `;
+  }
+
+  // Tabla
+  const q   = (document.getElementById('eg-search')?.value || '').toLowerCase();
+  const fEst = document.getElementById('eg-filter-estado')?.value || '';
+
+  const rows = engorde.filter(a => {
+    const m = !q || [a.caravana,a.campo,a.cliente,a.proveedor,a.notas].some(v => String(v||'').toLowerCase().includes(q));
+    return m && (!fEst || a.estado === fEst);
+  }).sort((a,b) => (b.fechaIngreso||'').localeCompare(a.fechaIngreso||''));
+
+  const tbody = document.getElementById('tabla-engorde');
+  if (!tbody) return;
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="empty-msg">No hay animales cargados.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(a => {
+    const total = (parseFloat(a.pesoEgreso)||0) * (parseFloat(a.precio)||0);
+    const badge = a.estado === 'En stock' ? 'b-green' : 'b-gray';
+    return `
+    <tr>
+      <td><strong>${esc(a.caravana||'')}</strong></td>
+      <td><span class="badge b-green">📍 ${esc(a.campo||'')}</span></td>
+      <td>${a.fechaIngreso ? fmtDate(a.fechaIngreso) : '—'}</td>
+      <td>${a.pesoIngreso ? fmtNum(a.pesoIngreso)+' kg' : '—'}</td>
+      <td>${a.pesoEgreso ? fmtNum(a.pesoEgreso)+' kg' : '—'}</td>
+      <td>${a.fechaEgreso ? fmtDate(a.fechaEgreso) : '—'}</td>
+      <td>${esc(a.cliente||'—')}</td>
+      <td>${total ? '$'+fmtNum(Math.round(total)) : '—'}</td>
+      <td><span class="badge ${badge}">${esc(a.estado||'')}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteEngorde('${a.id}'))">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function exportEngordeCSV() {
+  const engorde = animales.filter(a => a.categoria === 'Hacienda Engorde');
+  if (!engorde.length) { toast('No hay animales para exportar'); return; }
+  const cols = ['Caravana','Campo','Fecha ingreso','Peso ingreso (kg)','Proveedor','Fecha egreso','Peso egreso (kg)','Cliente','Precio $/kg','Total $','Estado','Notas'];
+  const data = engorde.map(a => {
+    const total = (parseFloat(a.pesoEgreso)||0) * (parseFloat(a.precio)||0);
+    return [a.caravana,a.campo,a.fechaIngreso,a.pesoIngreso,a.proveedor||'',a.fechaEgreso||'',a.pesoEgreso||'',a.cliente||'',a.precio||'',total||'',a.estado,a.notas||'']
+      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',');
+  });
+  downloadCSV([cols.join(','), ...data].join('\r\n'), `engorde_blenda_${todayISO()}.csv`);
+  toast('📄 CSV exportado');
+}
+
+function exportSenasa() {
+  const enStock = animales.filter(a => a.estado === 'En stock' && a.categoria === 'Hacienda Engorde');
+  if (!enStock.length) { toast('No hay animales en stock para reportar'); return; }
+  const cols = ['Caravana','Fecha ingreso','Campo','Peso ingreso (kg)','Proveedor'];
+  const data = enStock
+    .sort((a,b) => (a.caravana||'').localeCompare(b.caravana||''))
+    .map(a => [a.caravana, a.fechaIngreso, a.campo, a.pesoIngreso, a.proveedor||'']
+      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
+  const encabezado = [
+    `"REPORTE SENASA — STOCK ACTUAL DE HACIENDA ENGORDE"`,
+    `"Generado: ${new Date().toLocaleString('es-AR')}"`,
+    `"Total cabezas en stock: ${enStock.length}"`,
+    '',
+    cols.join(','),
+    ...data,
+  ];
+  downloadCSV(encabezado.join('\r\n'), `senasa_engorde_${todayISO()}.csv`);
+  toast(`📑 Reporte SENASA · ${enStock.length} caravanas`, '#14532d');
+}
+
+// ═══════════════════════════════════════════
 //  RENDER ALL
 // ═══════════════════════════════════════════
 
@@ -2595,6 +2984,7 @@ function renderAll() {
   renderCampos();
   renderProveedores();
   renderSiembras();
+  renderEngorde();
   renderNotas();
   actualizarValorizacion();
 }
@@ -3097,8 +3487,17 @@ async function cargarCotizaciones() {
 const GRANOS = ['Maíz','Soja','Trigo'];
 const HACIENDA = ['Hacienda Engorde','Hacienda Recría'];
 
-// Promedio ponderado de kg/cabeza para hacienda (usa los ingresos que tienen pesoProm cargado)
+// Promedio kg/cabeza para hacienda.
+// Engorde → promedio real de los animales individuales en stock.
+// Recría  → promedio ponderado de los ingresos colectivos con pesoProm cargado.
 function calcPesoPromHacienda(producto) {
+  if (producto === 'Hacienda Engorde') {
+    const enStock = (animales || []).filter(a => a.categoria === 'Hacienda Engorde' && a.estado === 'En stock' && (parseFloat(a.pesoIngreso)||0) > 0);
+    if (!enStock.length) return null;
+    const sum = enStock.reduce((s, a) => s + parseFloat(a.pesoIngreso), 0);
+    return sum / enStock.length;
+  }
+  // Recría (colectivo)
   let sumKg = 0, sumCant = 0;
   ingresos.forEach(i => {
     if (i.producto !== producto) return;
