@@ -390,7 +390,7 @@
   <div class="tab" onclick="showPage('salidas', this)">📤 Egresos</div>
   <div class="tab" onclick="showPage('resumen', this)">📈 Resumen</div>
   <div class="tab" onclick="showPage('siembra', this)">🌱 Siembra</div>
-  <div class="tab" onclick="showPage('animales', this)">🐄 Animales</div>
+  <div class="tab" onclick="showPage('animales', this)">🐄 Engorde</div>
   <div class="tab" onclick="showPage('tablas', this)">📋 Tablas</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
@@ -922,8 +922,8 @@
 
     <!-- KPIs -->
     <div class="card">
-      <h2>🐄 Registro individual de animales</h2>
-      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá cada animal con foto de la caravana (el N° se detecta automáticamente). El stock de hacienda se calcula a partir de los animales registrados.</p>
+      <h2>🐄 Hacienda Engorde — Registro individual</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá cada animal de engorde con foto de la caravana (el N° se detecta automáticamente). Solo aplica a engorde — para recría usá el ingreso colectivo normal.</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem" id="animales-kpis"></div>
     </div>
 
@@ -952,13 +952,7 @@
           <label for="an-caravana-ing">N° de caravana *</label>
           <input id="an-caravana-ing" type="text" placeholder="Ej: 1234" required />
         </div>
-        <div class="form-group">
-          <label for="an-categoria-ing">Categoría *</label>
-          <select id="an-categoria-ing" required>
-            <option value="Hacienda Engorde">🐄 Engorde</option>
-            <option value="Hacienda Recría">🐂 Recría</option>
-          </select>
-        </div>
+        <input id="an-categoria-ing" type="hidden" value="Hacienda Engorde" />
         <div class="form-group">
           <label for="an-peso-ing">Peso ingreso (kg) *</label>
           <input id="an-peso-ing" type="number" min="0" step="any" placeholder="Ej: 380" required />
@@ -1048,11 +1042,7 @@
       <h2>📋 Animales</h2>
       <div class="toolbar">
         <input id="an-search" type="search" placeholder="Buscar caravana, campo, cliente…" oninput="renderAnimales()" />
-        <select id="an-filter-categoria" onchange="renderAnimales()" style="width:auto;min-width:160px">
-          <option value="">Todas las categorías</option>
-          <option value="Hacienda Engorde">🐄 Engorde</option>
-          <option value="Hacienda Recría">🐂 Recría</option>
-        </select>
+        <input id="an-filter-categoria" type="hidden" value="" />
         <select id="an-filter-estado" onchange="renderAnimales()" style="width:auto;min-width:140px">
           <option value="">Todos</option>
           <option value="En stock">En stock</option>
@@ -1778,23 +1768,24 @@ function calcStock() {
   const stock = {};
   PRODUCTOS.forEach(p => stock[p] = 0);
 
-  // Granos: ingresos - salidas (hacienda se cuenta desde animales individuales más abajo)
+  // Granos y Recría se cuentan por ingresos - salidas (colectivo).
+  // Engorde se cuenta desde el registro individual de animales (más abajo).
   ingresos.forEach(i => {
-    if (HACIENDA && HACIENDA.includes(i.producto)) return;
+    if (i.producto === 'Hacienda Engorde') return;
     if (stock[i.producto] !== undefined) stock[i.producto] += parseFloat(i.cantidad) || 0;
     else stock[i.producto] = parseFloat(i.cantidad) || 0;
   });
 
   salidas.forEach(s => {
-    if (HACIENDA && HACIENDA.includes(s.producto)) return;
+    if (s.producto === 'Hacienda Engorde') return;
     if (stock[s.producto] !== undefined) stock[s.producto] -= parseFloat(s.cantidad) || 0;
     else stock[s.producto] = -(parseFloat(s.cantidad) || 0);
   });
 
-  // Hacienda: se cuenta desde el registro individual de animales en stock
+  // Hacienda Engorde: 1 caravana en stock = 1 cabeza
   animales.forEach(a => {
     if (a.estado !== 'En stock') return;
-    if (stock[a.categoria] !== undefined) stock[a.categoria] += 1;
+    if (a.categoria === 'Hacienda Engorde') stock['Hacienda Engorde'] += 1;
   });
 
   return stock;
@@ -3095,27 +3086,27 @@ function renderAnimales() {
   const dlCl = document.getElementById('lista-clientes-an');  if (dlCl) dlCl.innerHTML = optsClientes;
   const dlP = document.getElementById('lista-proveedores-an'); if (dlP) dlP.innerHTML = optsProv;
 
-  // KPIs
-  const enStock = animales.filter(a => a.estado === 'En stock');
-  const engStock = enStock.filter(a => a.categoria === 'Hacienda Engorde');
-  const recStock = enStock.filter(a => a.categoria === 'Hacienda Recría');
-  const egresados = animales.filter(a => a.estado === 'Egresado').length;
-  const pesoTotalStock = enStock.reduce((s, a) => s + (parseFloat(a.pesoIngreso)||0), 0);
+  // KPIs (solo Engorde)
+  const engAll      = animales.filter(a => a.categoria === 'Hacienda Engorde');
+  const enStock     = engAll.filter(a => a.estado === 'En stock');
+  const egresados   = engAll.filter(a => a.estado === 'Egresado').length;
+  const pesoTotal   = enStock.reduce((s, a) => s + (parseFloat(a.pesoIngreso)||0), 0);
+  const pesoProm    = enStock.length ? Math.round(pesoTotal / enStock.length) : 0;
 
   const kpisEl = document.getElementById('animales-kpis');
   if (kpisEl) {
     kpisEl.innerHTML = `
       <div style="background:var(--amber-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--amber);text-transform:uppercase">🐄 Engorde en stock</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#92400e;margin-top:.2rem">${engStock.length}</div>
-      </div>
-      <div style="background:#fff7ed;border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:#9a3412;text-transform:uppercase">🐂 Recría en stock</div>
-        <div style="font-size:1.4rem;font-weight:800;color:#7c2d12;margin-top:.2rem">${recStock.length}</div>
+        <div style="font-size:.7rem;font-weight:700;color:var(--amber);text-transform:uppercase">🐄 En stock</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#92400e;margin-top:.2rem">${enStock.length}</div>
       </div>
       <div style="background:var(--green-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
-        <div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase">Peso total stock</div>
-        <div style="font-size:1.4rem;font-weight:800;color:var(--green-dark);margin-top:.2rem">${fmtNum(Math.round(pesoTotalStock))} kg</div>
+        <div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase">Peso total</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--green-dark);margin-top:.2rem">${fmtNum(Math.round(pesoTotal))} kg</div>
+      </div>
+      <div style="background:#dbeafe;border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:#1e40af;text-transform:uppercase">Peso prom.</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#1e3a8a;margin-top:.2rem">${pesoProm ? fmtNum(pesoProm)+' kg' : '—'}</div>
       </div>
       <div style="background:var(--gray-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
         <div style="font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase">Egresados</div>
@@ -3130,8 +3121,9 @@ function renderAnimales() {
   const fEst  = document.getElementById('an-filter-estado')?.value || '';
 
   const rows = animales.filter(a => {
+    if (a.categoria !== 'Hacienda Engorde') return false; // solo Engorde en esta página
     const m = !q || [a.caravana,a.campo,a.cliente,a.proveedor,a.notas].some(v => String(v||'').toLowerCase().includes(q));
-    return m && (!fCat || a.categoria === fCat) && (!fEst || a.estado === fEst);
+    return m && (!fEst || a.estado === fEst);
   }).sort((a,b) => (b.fechaIngreso||'').localeCompare(a.fechaIngreso||''));
 
   const tbody = document.getElementById('tabla-animales');
@@ -3691,14 +3683,17 @@ async function cargarCotizaciones() {
 const GRANOS = ['Maíz','Soja','Trigo'];
 const HACIENDA = ['Hacienda Engorde','Hacienda Recría'];
 
-// Peso promedio kg/cabeza para hacienda: promedia el peso de ingreso de animales en stock
+// Peso promedio kg/cabeza para hacienda
+// Engorde → promedio real de los animales individuales en stock
+// Recría  → promedio ponderado de los ingresos colectivos con pesoProm cargado
 function calcPesoPromHacienda(producto) {
-  const enStock = animales.filter(a => a.categoria === producto && a.estado === 'En stock' && (parseFloat(a.pesoIngreso)||0) > 0);
-  if (enStock.length) {
+  if (producto === 'Hacienda Engorde') {
+    const enStock = animales.filter(a => a.categoria === 'Hacienda Engorde' && a.estado === 'En stock' && (parseFloat(a.pesoIngreso)||0) > 0);
+    if (!enStock.length) return null;
     const sum = enStock.reduce((s, a) => s + parseFloat(a.pesoIngreso), 0);
     return sum / enStock.length;
   }
-  // Fallback: si hay ingresos viejos cargados con pesoProm
+  // Recría (colectivo)
   let sumKg = 0, sumCant = 0;
   ingresos.forEach(i => {
     if (i.producto !== producto) return;
