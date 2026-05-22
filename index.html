@@ -390,6 +390,7 @@
   <div class="tab" onclick="showPage('salidas', this)">📤 Egresos</div>
   <div class="tab" onclick="showPage('resumen', this)">📈 Resumen</div>
   <div class="tab" onclick="showPage('siembra', this)">🌱 Siembra</div>
+  <div class="tab" onclick="showPage('animales', this)">🐄 Animales</div>
   <div class="tab" onclick="showPage('tablas', this)">📋 Tablas</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
@@ -915,6 +916,153 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════ ANIMALES ═══════════════════════════════ -->
+<div class="page" id="page-animales">
+  <div class="container">
+
+    <!-- KPIs -->
+    <div class="card">
+      <h2>🐄 Registro individual de animales</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá cada animal con foto de la caravana (el N° se detecta automáticamente). El stock de hacienda se calcula a partir de los animales registrados.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem" id="animales-kpis"></div>
+    </div>
+
+    <!-- Cargar ingreso -->
+    <div class="card">
+      <h2>📥 Ingresar animal (foto caravana)</h2>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label for="an-foto-ing">📷 Foto de caravana</label>
+          <input id="an-foto-ing" type="file" accept="image/*" capture="environment" onchange="procesarFotoOCR(this.files[0], 'ing')" />
+          <div id="an-ocr-status-ing" style="font-size:.78rem;color:var(--gray);margin-top:.35rem">Tocá para sacar la foto. El N° se detecta automáticamente.</div>
+          <img id="an-preview-ing" style="display:none;max-height:140px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
+        </div>
+        <div class="form-group">
+          <label for="an-caravana-ing">N° de caravana *</label>
+          <input id="an-caravana-ing" type="text" placeholder="Ej: 1234" required />
+        </div>
+        <div class="form-group">
+          <label for="an-categoria-ing">Categoría *</label>
+          <select id="an-categoria-ing" required>
+            <option value="Hacienda Engorde">🐄 Engorde</option>
+            <option value="Hacienda Recría">🐂 Recría</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="an-peso-ing">Peso ingreso (kg) *</label>
+          <input id="an-peso-ing" type="number" min="0" step="any" placeholder="Ej: 380" required />
+        </div>
+        <div class="form-group">
+          <label for="an-campo-ing">Campo / Lote *</label>
+          <input id="an-campo-ing" type="text" placeholder="Ej: Campo Norte" list="lista-campos-an" required />
+          <datalist id="lista-campos-an"></datalist>
+        </div>
+        <div class="form-group">
+          <label for="an-proveedor-ing">Proveedor (opcional)</label>
+          <input id="an-proveedor-ing" type="text" placeholder="Si es compra" list="lista-proveedores-an" />
+          <datalist id="lista-proveedores-an"></datalist>
+        </div>
+        <div class="form-group">
+          <label for="an-fecha-ing">Fecha ingreso</label>
+          <input id="an-fecha-ing" type="date" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label for="an-notas-ing">Notas</label>
+          <textarea id="an-notas-ing" placeholder="Observaciones del animal…"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="resetAnimalIng()">Limpiar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarAnimal()">Guardar animal</button>
+      </div>
+    </div>
+
+    <!-- Egresar animal -->
+    <div class="card">
+      <h2>📤 Egresar animal (foto caravana)</h2>
+      <p style="font-size:.82rem;color:var(--gray);margin-bottom:.75rem">Sacá la foto de la caravana del animal que sale. El sistema lo busca y lo da de baja del stock.</p>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column:1/-1">
+          <label for="an-foto-egr">📷 Foto de caravana</label>
+          <input id="an-foto-egr" type="file" accept="image/*" capture="environment" onchange="procesarFotoOCR(this.files[0], 'egr')" />
+          <div id="an-ocr-status-egr" style="font-size:.78rem;color:var(--gray);margin-top:.35rem">Tocá para sacar la foto.</div>
+          <img id="an-preview-egr" style="display:none;max-height:140px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
+        </div>
+        <div class="form-group">
+          <label for="an-caravana-egr">N° de caravana *</label>
+          <input id="an-caravana-egr" type="text" placeholder="Ej: 1234" oninput="buscarAnimalEgreso()" required />
+          <div id="an-match-egr" style="font-size:.78rem;margin-top:.3rem;color:var(--gray)"></div>
+        </div>
+        <div class="form-group">
+          <label for="an-peso-egr">Peso salida (kg)</label>
+          <input id="an-peso-egr" type="number" min="0" step="any" placeholder="Ej: 460" />
+        </div>
+        <div class="form-group">
+          <label for="an-precio-egr">Precio $/kg</label>
+          <input id="an-precio-egr" type="number" min="0" step="any" placeholder="Ej: 4800" />
+        </div>
+        <div class="form-group">
+          <label for="an-cliente-egr">Cliente / Destino</label>
+          <input id="an-cliente-egr" type="text" placeholder="Cliente" list="lista-clientes-an" />
+          <datalist id="lista-clientes-an"></datalist>
+        </div>
+        <div class="form-group">
+          <label for="an-fecha-egr">Fecha egreso</label>
+          <input id="an-fecha-egr" type="date" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label for="an-notas-egr">Notas</label>
+          <textarea id="an-notas-egr" placeholder="Observaciones de la venta…"></textarea>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="resetAnimalEgr()">Limpiar</button>
+        <button type="button" class="btn btn-primary" style="background:#7c3aed" onclick="egresarAnimal()">Egresar animal</button>
+      </div>
+    </div>
+
+    <!-- Listado -->
+    <div class="card">
+      <h2>📋 Animales</h2>
+      <div class="toolbar">
+        <input id="an-search" type="search" placeholder="Buscar caravana, campo, cliente…" oninput="renderAnimales()" />
+        <select id="an-filter-categoria" onchange="renderAnimales()" style="width:auto;min-width:160px">
+          <option value="">Todas las categorías</option>
+          <option value="Hacienda Engorde">🐄 Engorde</option>
+          <option value="Hacienda Recría">🐂 Recría</option>
+        </select>
+        <select id="an-filter-estado" onchange="renderAnimales()" style="width:auto;min-width:140px">
+          <option value="">Todos</option>
+          <option value="En stock">En stock</option>
+          <option value="Egresado">Egresados</option>
+        </select>
+        <button class="btn btn-blue btn-sm" onclick="exportAnimalesCSV()">Exportar CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Caravana</th>
+              <th>Categoría</th>
+              <th>Campo</th>
+              <th>Ingreso</th>
+              <th>Peso ing.</th>
+              <th>Peso sal.</th>
+              <th>Egreso</th>
+              <th>Cliente</th>
+              <th>$ Total</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-animales"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- ═══════════════════════════════ TABLAS ═══════════════════════════════ -->
 <div class="page" id="page-tablas">
   <div class="container">
@@ -1425,6 +1573,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <script>
 // ═══════════════════════════════════════════
@@ -1454,9 +1603,10 @@ let notas       = [];
 let campos      = [];
 let proveedores = [];
 let siembras    = [];
+let animales    = [];
 
 // Contadores para saber cuándo todos los listeners cargaron por primera vez
-let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false, siembras: false };
+let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false, siembras: false, animales: false };
 
 function checkLoaded() {
   return Object.values(_loaded).every(Boolean);
@@ -1505,6 +1655,12 @@ db.collection('siembras').onSnapshot(snap => {
   if (checkLoaded()) renderAll();
 });
 
+db.collection('animales').onSnapshot(snap => {
+  animales = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.animales = true;
+  if (checkLoaded()) renderAll();
+});
+
 // ── helpers Firestore ──
 const COL = {
   salidas:     () => db.collection('salidas'),
@@ -1514,6 +1670,7 @@ const COL = {
   campos:      () => db.collection('campos'),
   proveedores: () => db.collection('proveedores'),
   siembras:    () => db.collection('siembras'),
+  animales:    () => db.collection('animales'),
 };
 
 const PRODUCTOS = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría','Otro'];
@@ -1599,14 +1756,23 @@ function calcStock() {
   const stock = {};
   PRODUCTOS.forEach(p => stock[p] = 0);
 
+  // Granos: ingresos - salidas (hacienda se cuenta desde animales individuales más abajo)
   ingresos.forEach(i => {
+    if (HACIENDA && HACIENDA.includes(i.producto)) return;
     if (stock[i.producto] !== undefined) stock[i.producto] += parseFloat(i.cantidad) || 0;
     else stock[i.producto] = parseFloat(i.cantidad) || 0;
   });
 
   salidas.forEach(s => {
+    if (HACIENDA && HACIENDA.includes(s.producto)) return;
     if (stock[s.producto] !== undefined) stock[s.producto] -= parseFloat(s.cantidad) || 0;
     else stock[s.producto] = -(parseFloat(s.cantidad) || 0);
+  });
+
+  // Hacienda: se cuenta desde el registro individual de animales en stock
+  animales.forEach(a => {
+    if (a.estado !== 'En stock') return;
+    if (stock[a.categoria] !== undefined) stock[a.categoria] += 1;
   });
 
   return stock;
@@ -2590,6 +2756,276 @@ function exportSiembrasCSV() {
 }
 
 // ═══════════════════════════════════════════
+//  ANIMALES (registro individual con OCR de caravana)
+// ═══════════════════════════════════════════
+
+// Inicializar fechas
+document.getElementById('an-fecha-ing').value = todayISO();
+document.getElementById('an-fecha-egr').value = todayISO();
+
+// ── OCR: extrae número de caravana de la foto con Tesseract.js ──
+async function procesarFotoOCR(file, tipo) {
+  if (!file) return;
+  const statusEl  = document.getElementById('an-ocr-status-' + tipo);
+  const previewEl = document.getElementById('an-preview-' + tipo);
+  const inputEl   = document.getElementById('an-caravana-' + tipo);
+
+  // Mostrar preview
+  previewEl.src = URL.createObjectURL(file);
+  previewEl.style.display = 'block';
+  statusEl.innerHTML = '⏳ Leyendo caravana…';
+
+  if (typeof Tesseract === 'undefined') {
+    statusEl.innerHTML = '⚠️ OCR no disponible. Cargá el número manualmente.';
+    return;
+  }
+
+  try {
+    const result = await Tesseract.recognize(file, 'eng', {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          statusEl.innerHTML = `⏳ Procesando ${Math.round(m.progress*100)}%`;
+        }
+      },
+      tessedit_char_whitelist: '0123456789'
+    });
+    const text = (result.data.text || '').replace(/\s+/g, ' ');
+    // Buscar el grupo de dígitos más largo (3+ números seguidos)
+    const matches = text.match(/\d{3,}/g) || [];
+    if (matches.length) {
+      // Usar el más largo
+      const mejor = matches.sort((a,b) => b.length - a.length)[0];
+      inputEl.value = mejor;
+      statusEl.innerHTML = `✅ Detectado: <strong>${mejor}</strong> (corrigelo si está mal)`;
+      if (tipo === 'egr') buscarAnimalEgreso();
+    } else {
+      statusEl.innerHTML = '⚠️ No se detectó número claro. Cargalo a mano.';
+    }
+  } catch (e) {
+    console.warn('OCR error:', e);
+    statusEl.innerHTML = '⚠️ Error al leer la foto. Cargá el N° manualmente.';
+  }
+}
+
+async function guardarAnimal() {
+  const caravana  = document.getElementById('an-caravana-ing').value.trim();
+  const categoria = document.getElementById('an-categoria-ing').value;
+  const peso      = parseFloat(document.getElementById('an-peso-ing').value) || 0;
+  const campo     = document.getElementById('an-campo-ing').value.trim();
+  const proveedor = document.getElementById('an-proveedor-ing').value.trim();
+  const fecha     = document.getElementById('an-fecha-ing').value;
+  const notas     = document.getElementById('an-notas-ing').value.trim();
+
+  if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
+  if (!peso)     { toast('⚠️ Cargá el peso de ingreso'); return; }
+  if (!campo)    { toast('⚠️ Cargá el campo'); return; }
+
+  // Verificar duplicado activo
+  const duplicado = animales.find(a => (a.caravana||'').trim() === caravana && a.estado === 'En stock');
+  if (duplicado) {
+    if (!confirm(`Ya hay un animal con caravana "${caravana}" en stock. ¿Cargar otro igual?`)) return;
+  }
+
+  // Validar campo contra tabla
+  const okCampo = await validarYAgregarRef(campo, campos, 'Campos',
+    () => COL.campos().add({ nombre: campo, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
+  );
+  if (!okCampo) return;
+
+  // Validar proveedor si está cargado
+  if (proveedor) {
+    const okProv = await validarYAgregarRef(proveedor, proveedores, 'Proveedores',
+      () => COL.proveedores().add({ nombre: proveedor, cuit:'', tel:'', email:'', localidad:'', rubro:'', notas:'' })
+    );
+    if (!okProv) return;
+  }
+
+  const rec = {
+    caravana, categoria,
+    pesoIngreso: peso,
+    campo,
+    proveedor,
+    fechaIngreso: fecha || todayISO(),
+    estado: 'En stock',
+    notas,
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  COL.animales().add(rec).then(() => {
+    resetAnimalIng();
+    toast('✅ Animal cargado · stock actualizado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+}
+
+function resetAnimalIng() {
+  document.getElementById('an-caravana-ing').value = '';
+  document.getElementById('an-peso-ing').value = '';
+  document.getElementById('an-campo-ing').value = '';
+  document.getElementById('an-proveedor-ing').value = '';
+  document.getElementById('an-notas-ing').value = '';
+  document.getElementById('an-foto-ing').value = '';
+  document.getElementById('an-preview-ing').style.display = 'none';
+  document.getElementById('an-ocr-status-ing').innerHTML = 'Tocá para sacar la foto. El N° se detecta automáticamente.';
+  document.getElementById('an-fecha-ing').value = todayISO();
+}
+
+function buscarAnimalEgreso() {
+  const caravana = document.getElementById('an-caravana-egr').value.trim();
+  const matchEl  = document.getElementById('an-match-egr');
+  if (!caravana) { matchEl.innerHTML = ''; return; }
+  const a = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'En stock');
+  if (a) {
+    matchEl.innerHTML = `<span style="color:var(--green-dark);font-weight:600">✅ ${a.categoria} · ${fmtNum(a.pesoIngreso)} kg ingreso · 📍 ${esc(a.campo)}</span>`;
+  } else {
+    const egresado = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'Egresado');
+    if (egresado) {
+      matchEl.innerHTML = `<span style="color:var(--amber)">⚠️ Caravana ${caravana} ya fue egresada el ${fmtDate(egresado.fechaEgreso)}</span>`;
+    } else {
+      matchEl.innerHTML = `<span style="color:var(--red)">❌ Caravana ${caravana} no está en stock</span>`;
+    }
+  }
+}
+
+async function egresarAnimal() {
+  const caravana = document.getElementById('an-caravana-egr').value.trim();
+  const peso     = parseFloat(document.getElementById('an-peso-egr').value) || 0;
+  const precio   = parseFloat(document.getElementById('an-precio-egr').value) || 0;
+  const cliente  = document.getElementById('an-cliente-egr').value.trim();
+  const fecha    = document.getElementById('an-fecha-egr').value;
+  const notas    = document.getElementById('an-notas-egr').value.trim();
+
+  if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
+
+  const animal = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'En stock');
+  if (!animal) { toast(`❌ La caravana ${caravana} no está en stock`); return; }
+
+  if (cliente) {
+    const okCliente = await validarYAgregarRef(cliente, clientes, 'Clientes',
+      () => COL.clientes().add({ nombre: cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' })
+    );
+    if (!okCliente) return;
+  }
+
+  const data = {
+    estado: 'Egresado',
+    fechaEgreso: fecha || todayISO(),
+    pesoEgreso: peso,
+    precio,
+    cliente,
+    notasEgreso: notas,
+  };
+  COL.animales().doc(animal.id).update(data).then(() => {
+    resetAnimalEgr();
+    toast(`✅ Caravana ${caravana} egresada · stock actualizado`, '#14532d');
+  }).catch(() => toast('❌ Error al egresar.'));
+}
+
+function resetAnimalEgr() {
+  document.getElementById('an-caravana-egr').value = '';
+  document.getElementById('an-peso-egr').value = '';
+  document.getElementById('an-precio-egr').value = '';
+  document.getElementById('an-cliente-egr').value = '';
+  document.getElementById('an-notas-egr').value = '';
+  document.getElementById('an-foto-egr').value = '';
+  document.getElementById('an-preview-egr').style.display = 'none';
+  document.getElementById('an-ocr-status-egr').innerHTML = 'Tocá para sacar la foto.';
+  document.getElementById('an-match-egr').innerHTML = '';
+  document.getElementById('an-fecha-egr').value = todayISO();
+}
+
+function deleteAnimal(id) {
+  COL.animales().doc(id).delete().then(() => toast('🗑️ Animal eliminado'))
+    .catch(() => toast('❌ Error al eliminar.'));
+}
+
+function renderAnimales() {
+  // Datalists
+  const optsCampos = [...new Set(campos.map(c => c.nombre))].map(n => `<option value="${esc(n)}">`).join('');
+  const optsClientes = clientes.map(c => `<option value="${esc(c.nombre)}">`).join('');
+  const optsProv = proveedores.map(p => `<option value="${esc(p.nombre)}">`).join('');
+  const dlC = document.getElementById('lista-campos-an');     if (dlC) dlC.innerHTML = optsCampos;
+  const dlCl = document.getElementById('lista-clientes-an');  if (dlCl) dlCl.innerHTML = optsClientes;
+  const dlP = document.getElementById('lista-proveedores-an'); if (dlP) dlP.innerHTML = optsProv;
+
+  // KPIs
+  const enStock = animales.filter(a => a.estado === 'En stock');
+  const engStock = enStock.filter(a => a.categoria === 'Hacienda Engorde');
+  const recStock = enStock.filter(a => a.categoria === 'Hacienda Recría');
+  const egresados = animales.filter(a => a.estado === 'Egresado').length;
+  const pesoTotalStock = enStock.reduce((s, a) => s + (parseFloat(a.pesoIngreso)||0), 0);
+
+  const kpisEl = document.getElementById('animales-kpis');
+  if (kpisEl) {
+    kpisEl.innerHTML = `
+      <div style="background:var(--amber-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--amber);text-transform:uppercase">🐄 Engorde en stock</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#92400e;margin-top:.2rem">${engStock.length}</div>
+      </div>
+      <div style="background:#fff7ed;border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:#9a3412;text-transform:uppercase">🐂 Recría en stock</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#7c2d12;margin-top:.2rem">${recStock.length}</div>
+      </div>
+      <div style="background:var(--green-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase">Peso total stock</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--green-dark);margin-top:.2rem">${fmtNum(Math.round(pesoTotalStock))} kg</div>
+      </div>
+      <div style="background:var(--gray-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase">Egresados</div>
+        <div style="font-size:1.4rem;font-weight:800;color:var(--gray-dark);margin-top:.2rem">${egresados}</div>
+      </div>
+    `;
+  }
+
+  // Tabla
+  const q     = (document.getElementById('an-search')?.value || '').toLowerCase();
+  const fCat  = document.getElementById('an-filter-categoria')?.value || '';
+  const fEst  = document.getElementById('an-filter-estado')?.value || '';
+
+  const rows = animales.filter(a => {
+    const m = !q || [a.caravana,a.campo,a.cliente,a.proveedor,a.notas].some(v => String(v||'').toLowerCase().includes(q));
+    return m && (!fCat || a.categoria === fCat) && (!fEst || a.estado === fEst);
+  }).sort((a,b) => (b.fechaIngreso||'').localeCompare(a.fechaIngreso||''));
+
+  const tbody = document.getElementById('tabla-animales');
+  if (!tbody) return;
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" class="empty-msg">No hay animales cargados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(a => {
+    const total = (parseFloat(a.pesoEgreso)||0) * (parseFloat(a.precio)||0);
+    const icono = a.categoria === 'Hacienda Engorde' ? '🐄' : '🐂';
+    const badge = a.estado === 'En stock' ? 'b-green' : 'b-gray';
+    return `
+    <tr>
+      <td><strong>${esc(a.caravana||'')}</strong></td>
+      <td>${icono} ${esc((a.categoria||'').replace('Hacienda ',''))}</td>
+      <td><span class="badge b-green">📍 ${esc(a.campo||'')}</span></td>
+      <td>${a.fechaIngreso ? fmtDate(a.fechaIngreso) : '—'}</td>
+      <td>${a.pesoIngreso ? fmtNum(a.pesoIngreso)+' kg' : '—'}</td>
+      <td>${a.pesoEgreso ? fmtNum(a.pesoEgreso)+' kg' : '—'}</td>
+      <td>${a.fechaEgreso ? fmtDate(a.fechaEgreso) : '—'}</td>
+      <td>${esc(a.cliente||'—')}</td>
+      <td>${total ? '$'+fmtNum(Math.round(total)) : '—'}</td>
+      <td><span class="badge ${badge}">${esc(a.estado||'')}</span></td>
+      <td><button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteAnimal('${a.id}'))">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function exportAnimalesCSV() {
+  if (!animales.length) { toast('No hay animales para exportar'); return; }
+  const cols = ['Caravana','Categoría','Campo','Fecha ingreso','Peso ingreso kg','Fecha egreso','Peso egreso kg','Cliente','Precio $/kg','Total $','Estado','Proveedor','Notas'];
+  const data = animales.map(a => {
+    const total = (parseFloat(a.pesoEgreso)||0) * (parseFloat(a.precio)||0);
+    return [a.caravana,a.categoria,a.campo,a.fechaIngreso,a.pesoIngreso,a.fechaEgreso,a.pesoEgreso,a.cliente,a.precio,total,a.estado,a.proveedor,a.notas]
+      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',');
+  });
+  downloadCSV([cols.join(','), ...data].join('\r\n'), `animales_blenda_${todayISO()}.csv`);
+  toast('📄 CSV exportado');
+}
+
+// ═══════════════════════════════════════════
 //  RENDER ALL
 // ═══════════════════════════════════════════
 
@@ -2603,6 +3039,7 @@ function renderAll() {
   renderCampos();
   renderProveedores();
   renderSiembras();
+  renderAnimales();
   renderNotas();
   actualizarValorizacion();
 }
@@ -3105,8 +3542,14 @@ async function cargarCotizaciones() {
 const GRANOS = ['Maíz','Soja','Trigo'];
 const HACIENDA = ['Hacienda Engorde','Hacienda Recría'];
 
-// Promedio ponderado de kg/cabeza para hacienda (usa los ingresos que tienen pesoProm cargado)
+// Peso promedio kg/cabeza para hacienda: promedia el peso de ingreso de animales en stock
 function calcPesoPromHacienda(producto) {
+  const enStock = animales.filter(a => a.categoria === producto && a.estado === 'En stock' && (parseFloat(a.pesoIngreso)||0) > 0);
+  if (enStock.length) {
+    const sum = enStock.reduce((s, a) => s + parseFloat(a.pesoIngreso), 0);
+    return sum / enStock.length;
+  }
+  // Fallback: si hay ingresos viejos cargados con pesoProm
   let sumKg = 0, sumCant = 0;
   ingresos.forEach(i => {
     if (i.producto !== producto) return;
