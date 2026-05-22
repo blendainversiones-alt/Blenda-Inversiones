@@ -4067,7 +4067,77 @@ async function cargarCotizaciones() {
     console.warn('BCR falló:', eBCR.message);
   }
 
-  // ── Fallback 1: usar último cache local (si el mercado está cerrado) ──
+  // ── Fallback 1: Yahoo Finance (CBOT) — funciona aunque BCR esté caído ──
+  try {
+    let usdARS = 1;
+    try {
+      const resD = await fetch('https://dolarapi.com/v1/dolares/oficial');
+      const dD = await resD.json();
+      usdARS = dD.venta || 1;
+    } catch(e) {}
+
+    const granos = [
+      { key:'Soja',  ticker:'ZS=F', bpt:36.7437 },
+      { key:'Maíz',  ticker:'ZC=F', bpt:39.3683 },
+      { key:'Trigo', ticker:'ZW=F', bpt:36.7437 },
+    ];
+    const preciosYF = {};
+    // Probamos directo y con proxy si CORS falla
+    await Promise.all(granos.map(async g => {
+      const urls = [
+        `https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`,
+        `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`)}`,
+      ];
+      for (const u of urls) {
+        try {
+          const r = await fetch(u);
+          if (!r.ok) continue;
+          const d = await r.json();
+          const pUSD = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if (pUSD) {
+            preciosYF[g.key] = (pUSD / g.bpt) * usdARS;
+            return;
+          }
+        } catch(e) {}
+      }
+    }));
+
+    if (Object.keys(preciosYF).length) {
+      // Aplicar overrides manuales
+      const manuales = getPreciosManuales();
+      preciosCot = {};
+      Object.entries(preciosYF).forEach(([k, ars]) => {
+        preciosCot[k] = { ars: manuales[k] > 0 ? manuales[k] : ars, usd: ars / usdARS, label: k, fuente: manuales[k] > 0 ? 'Manual' : 'CBOT' };
+      });
+      Object.entries(manuales).forEach(([k, ars]) => {
+        if (ars > 0 && !preciosCot[k]) preciosCot[k] = { ars, usd: null, label: k, fuente: 'Manual' };
+      });
+
+      const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      const items = [
+        { label:'💵 Dólar oficial', valor:`$${fmtNum(Math.round(usdARS))}`, sub:'BNA · por USD' },
+        ...Object.entries(preciosCot).map(([k, v]) => ({
+          label: `${ICONOS[k]||''} ${k}`,
+          valor: `$${fmtNum(Math.round(v.ars))}/tn`,
+          sub:   v.fuente === 'Manual' ? '✏️ Manual' : `≈ USD ${fmtNum(Math.round(v.usd))} · CBOT`,
+        })),
+      ];
+      grid.innerHTML =
+        `<div style="grid-column:1/-1;background:#fef3c7;border:1.5px solid #fbbf24;color:#78350f;padding:.55rem .85rem;border-radius:8px;font-size:.78rem;margin-bottom:.5rem">⚠️ BCR Rosario sin datos hoy${mercadoCerrado?' (mercado cerrado)':''} — usando referencia CBOT × dólar oficial.</div>` +
+        items.map(it => `
+          <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
+            <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
+            <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
+            <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
+          </div>
+        `).join('') + renderEditorPreciosManual() +
+        `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 Yahoo Finance CBOT × dolarapi · 🕐 ${hora}</div>`;
+      actualizarValorizacion();
+      return;
+    }
+  } catch(eYF) { console.warn('Yahoo falló:', eYF.message); }
+
+  // ── Fallback 2: usar último cache local (si el mercado está cerrado) ──
   try {
     const cache = JSON.parse(localStorage.getItem(PRECIOS_CACHE_KEY) || 'null');
     if (cache && cache.precios && Object.keys(cache.precios).length) {
