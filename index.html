@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Blenda Hnos — Control de Stock</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Blenda Hnos — Control de Stock v5</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1000,24 +1003,22 @@
       </div>
     </div>
 
-    <!-- Egresar animal -->
-    <div class="card">
-      <h2>📤 Egresar animal (foto caravana)</h2>
-      <p style="font-size:.82rem;color:var(--gray);margin-bottom:.75rem">Sacá la foto de la caravana del animal que sale. El sistema lo busca y lo da de baja del stock.</p>
+    <!-- 3. Datos del egreso -->
+    <div class="card" style="border-left:4px solid #7c3aed">
+      <h2>📤 Datos del egreso / venta</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá una sola vez los datos comunes, después escaneás las caravanas de los que salen.</p>
       <div class="form-grid">
-        <div class="form-group" style="grid-column:1/-1">
-          <input id="an-foto-egr" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'egr')" />
-          <button type="button" class="btn btn-primary" style="font-size:1rem;padding:.85rem 1.5rem;width:100%;max-width:320px;background:#7c3aed" onclick="document.getElementById('an-foto-egr').click()">📷 Tomar foto de caravana <small style="opacity:.6">v3</small></button>
-          <div id="an-ocr-status-egr" style="font-size:.78rem;color:var(--gray);margin-top:.5rem"></div>
-          <img id="an-preview-egr" style="display:none;width:100%;max-height:360px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
+        <div class="form-group">
+          <label for="an-cliente-egr">Cliente / Destino *</label>
+          <input id="an-cliente-egr" type="text" placeholder="Cliente" list="lista-clientes-an" required />
+          <datalist id="lista-clientes-an"></datalist>
         </div>
         <div class="form-group">
-          <label for="an-caravana-egr">N° de caravana *</label>
-          <input id="an-caravana-egr" type="text" placeholder="Ej: 1234" oninput="buscarAnimalEgreso()" required />
-          <div id="an-match-egr" style="font-size:.78rem;margin-top:.3rem;color:var(--gray)"></div>
+          <label for="an-fecha-egr">Fecha egreso *</label>
+          <input id="an-fecha-egr" type="date" required />
         </div>
         <div class="form-group">
-          <label for="an-peso-egr">Peso salida (kg)</label>
+          <label for="an-peso-egr">Peso prom. salida (kg/cab)</label>
           <input id="an-peso-egr" type="number" min="0" step="any" placeholder="Ej: 460" />
         </div>
         <div class="form-group">
@@ -1025,22 +1026,51 @@
           <input id="an-precio-egr" type="number" min="0" step="any" placeholder="Ej: 4800" />
         </div>
         <div class="form-group">
-          <label for="an-cliente-egr">Cliente / Destino</label>
-          <input id="an-cliente-egr" type="text" placeholder="Cliente" list="lista-clientes-an" />
-          <datalist id="lista-clientes-an"></datalist>
-        </div>
-        <div class="form-group">
-          <label for="an-fecha-egr">Fecha egreso</label>
-          <input id="an-fecha-egr" type="date" />
+          <label for="an-cantidad-egr">Cantidad a egresar</label>
+          <input id="an-cantidad-egr" type="number" min="0" step="1" placeholder="Ej: 30" oninput="actualizarContadorEgreso()" />
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label for="an-notas-egr">Notas</label>
-          <textarea id="an-notas-egr" placeholder="Observaciones de la venta…"></textarea>
+          <label for="an-notas-egr">Notas del egreso</label>
+          <textarea id="an-notas-egr" placeholder="Remito, observaciones…"></textarea>
         </div>
       </div>
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="resetAnimalEgr()">Limpiar</button>
-        <button type="button" class="btn btn-primary" style="background:#7c3aed" onclick="egresarAnimal()">Egresar animal</button>
+      <div class="form-actions" style="justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="reiniciarEgreso()">🔄 Reiniciar egreso</button>
+      </div>
+    </div>
+
+    <!-- 4. Escanear caravanas para egresar -->
+    <div class="card" style="border-left:4px solid #7c3aed">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <h2 style="margin:0">📤 Escanear caravanas a egresar</h2>
+        <span id="contador-egreso" style="font-size:1rem;font-weight:800;color:#5b21b6;background:#ede9fe;padding:.35rem .85rem;border-radius:99px">0 / 0</span>
+      </div>
+      <p style="font-size:.85rem;color:var(--gray);margin:.6rem 0">Cada caravana se valida contra el stock actual. Si no está en stock, te avisa.</p>
+
+      <input id="an-foto-egr" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'egr')" />
+      <button type="button" class="btn btn-primary" style="font-size:1.05rem;padding:1rem 1.5rem;width:100%;background:#7c3aed" onclick="iniciarCapturaEgreso()">📷 Tomar foto de caravana <small style="opacity:.6">v5</small></button>
+
+      <div id="an-ocr-status-egr" style="font-size:.85rem;color:var(--gray);margin-top:.6rem"></div>
+      <img id="an-preview-egr" style="display:none;width:100%;max-height:280px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
+
+      <!-- Caja de confirmación / validación -->
+      <div id="confirma-egreso" style="display:none;margin-top:.75rem;border-radius:10px;padding:.85rem">
+        <div id="confirma-egreso-titulo" style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem"></div>
+        <input id="an-caravana-egr" type="text" style="font-size:1.25rem;font-weight:800;padding:.65rem;width:100%;text-align:center" placeholder="N° caravana" oninput="validarCaravanaEgreso()" />
+        <div id="confirma-egreso-info" style="font-size:.85rem;margin-top:.5rem"></div>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+          <button type="button" id="btn-confirmar-egreso" class="btn btn-primary" style="flex:1;font-size:1rem;padding:.8rem;background:#7c3aed" onclick="confirmarEgreso()">✅ Egresar y siguiente</button>
+          <button type="button" class="btn btn-secondary" onclick="cancelarEgreso()">Descartar</button>
+        </div>
+      </div>
+
+      <!-- Lista de caravanas egresadas en esta tanda -->
+      <div id="egresos-lote-wrap" style="display:none;margin-top:1rem;border-top:1px solid var(--border);padding-top:.8rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span style="font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Egresadas en esta tanda</span>
+          <button type="button" class="btn btn-danger btn-sm" onclick="deshacerUltimoEgreso()">↶ Deshacer última</button>
+        </div>
+        <div id="egresos-lote-list" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
       </div>
     </div>
 
@@ -2783,8 +2813,9 @@ function exportSiembrasCSV() {
 // Inicializar fechas
 document.getElementById('an-fecha-ing').value = todayISO();
 document.getElementById('an-fecha-egr').value = todayISO();
-// Inicializar contador del lote
+// Inicializar contadores
 actualizarContadorLote();
+actualizarContadorEgreso();
 
 // ── Cámara en vivo (getUserMedia) ──
 const camStreams = { ing: null, egr: null };
@@ -3065,17 +3096,14 @@ async function procesarFotoOCR(file, tipo) {
         (otros.length ? ` <small style="color:var(--gray)">· otros: ${otros.join(', ')}</small>` : '');
 
       if (tipo === 'ing') {
-        // Mostrar caja de confirmación para flujo en cadena
         mostrarConfirmacionCaravana(mejor);
       } else if (tipo === 'egr') {
-        buscarAnimalEgreso();
+        mostrarConfirmacionEgreso(mejor);
       }
     } else {
-      statusEl.innerHTML = `⚠️ No se detectó caravana. <small style="color:var(--gray)">Tocá nuevamente la foto y cargá el N° a mano.</small>`;
-      if (tipo === 'ing') {
-        // Mostrar la caja igual para que pueda cargar a mano
-        mostrarConfirmacionCaravana('');
-      }
+      statusEl.innerHTML = `⚠️ No se detectó caravana. <small style="color:var(--gray)">Cargá el N° a mano.</small>`;
+      if (tipo === 'ing') mostrarConfirmacionCaravana('');
+      if (tipo === 'egr') mostrarConfirmacionEgreso('');
     }
   } catch (e) {
     console.warn('OCR error:', e);
@@ -3255,37 +3283,99 @@ function exportarSenasa() {
   toast(`📑 Reporte SENASA generado · ${enStock.length} caravanas`, '#14532d');
 }
 
-function buscarAnimalEgreso() {
+// Egreso en lote
+let egresosLote = []; // [{ id, caravana, prevState }]
+
+function actualizarContadorEgreso() {
+  const esperada = parseInt(document.getElementById('an-cantidad-egr').value) || 0;
+  const cargada  = egresosLote.length;
+  const el = document.getElementById('contador-egreso');
+  if (!el) return;
+  let color = '#5b21b6', bg = '#ede9fe';
+  if (esperada > 0 && cargada > esperada) { color = '#7f1d1d'; bg = 'var(--red-light)'; }
+  else if (esperada > 0 && cargada === esperada) { color = '#fff'; bg = '#7c3aed'; }
+  el.style.color = color;
+  el.style.background = bg;
+  el.textContent = esperada > 0 ? `${cargada} / ${esperada}` : `${cargada}`;
+}
+
+function renderEgresosLote() {
+  const wrap = document.getElementById('egresos-lote-wrap');
+  const list = document.getElementById('egresos-lote-list');
+  if (!wrap || !list) return;
+  if (egresosLote.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = egresosLote.map(c =>
+    `<span style="background:#fff;border:1.5px solid #7c3aed;border-radius:99px;padding:.3rem .7rem;font-size:.82rem;font-weight:700;color:#5b21b6">📤 ${esc(c.caravana)}</span>`
+  ).join('');
+}
+
+function iniciarCapturaEgreso() {
+  const cliente = document.getElementById('an-cliente-egr').value.trim();
+  const fecha   = document.getElementById('an-fecha-egr').value;
+  if (!cliente) { toast('⚠️ Cargá el cliente arriba'); return; }
+  if (!fecha)   { toast('⚠️ Cargá la fecha de egreso arriba'); return; }
+  document.getElementById('an-foto-egr').click();
+}
+
+// Validar en vivo mientras escriben/corrigen la caravana
+function validarCaravanaEgreso() {
   const caravana = document.getElementById('an-caravana-egr').value.trim();
-  const matchEl  = document.getElementById('an-match-egr');
-  if (!caravana) { matchEl.innerHTML = ''; return; }
-  const a = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'En stock');
-  if (a) {
-    matchEl.innerHTML = `<span style="color:var(--green-dark);font-weight:600">✅ ${a.categoria} · ${fmtNum(a.pesoIngreso)} kg ingreso · 📍 ${esc(a.campo)}</span>`;
+  const info = document.getElementById('confirma-egreso-info');
+  const btn  = document.getElementById('btn-confirmar-egreso');
+  const cont = document.getElementById('confirma-egreso');
+  if (!info || !btn) return;
+  if (!caravana) { info.innerHTML = ''; btn.disabled = false; return; }
+
+  const enStock = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'En stock');
+  if (enStock) {
+    info.innerHTML = `<span style="color:var(--green-dark);font-weight:600">✅ EN STOCK</span> · ingresó ${fmtDate(enStock.fechaIngreso)} · ${fmtNum(enStock.pesoIngreso)} kg · 📍 ${esc(enStock.campo)}`;
+    cont.style.background = 'var(--green-light)';
+    cont.style.border = '1.5px solid var(--green)';
+    btn.disabled = false;
   } else {
-    const egresado = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'Egresado');
-    if (egresado) {
-      matchEl.innerHTML = `<span style="color:var(--amber)">⚠️ Caravana ${caravana} ya fue egresada el ${fmtDate(egresado.fechaEgreso)}</span>`;
+    const yaEgresado = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'Egresado');
+    if (yaEgresado) {
+      info.innerHTML = `<span style="color:var(--amber)">⚠️ YA EGRESADA</span> el ${fmtDate(yaEgresado.fechaEgreso)} a ${esc(yaEgresado.cliente||'—')}`;
     } else {
-      matchEl.innerHTML = `<span style="color:var(--red)">❌ Caravana ${caravana} no está en stock</span>`;
+      info.innerHTML = `<span style="color:var(--red);font-weight:600">❌ NO ESTÁ EN STOCK</span> · revisá el N° o cargala primero como ingreso`;
     }
+    cont.style.background = '#fee2e2';
+    cont.style.border = '1.5px solid var(--red)';
+    btn.disabled = true;
   }
 }
 
-async function egresarAnimal() {
-  const caravana = document.getElementById('an-caravana-egr').value.trim();
-  const peso     = parseFloat(document.getElementById('an-peso-egr').value) || 0;
-  const precio   = parseFloat(document.getElementById('an-precio-egr').value) || 0;
-  const cliente  = document.getElementById('an-cliente-egr').value.trim();
-  const fecha    = document.getElementById('an-fecha-egr').value;
-  const notas    = document.getElementById('an-notas-egr').value.trim();
+function mostrarConfirmacionEgreso(numero) {
+  document.getElementById('an-caravana-egr').value = numero;
+  document.getElementById('confirma-egreso-titulo').textContent = 'Caravana detectada';
+  document.getElementById('confirma-egreso').style.display = 'block';
+  validarCaravanaEgreso();
+}
 
+function cancelarEgreso() {
+  document.getElementById('confirma-egreso').style.display = 'none';
+  document.getElementById('an-caravana-egr').value = '';
+  document.getElementById('an-foto-egr').value = '';
+  document.getElementById('an-preview-egr').style.display = 'none';
+  document.getElementById('an-ocr-status-egr').innerHTML = '';
+}
+
+async function confirmarEgreso() {
+  const caravana = document.getElementById('an-caravana-egr').value.trim();
   if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
 
   const animal = animales.find(x => (x.caravana||'').trim() === caravana && x.estado === 'En stock');
   if (!animal) { toast(`❌ La caravana ${caravana} no está en stock`); return; }
 
-  if (cliente) {
+  const cliente = document.getElementById('an-cliente-egr').value.trim();
+  const fecha   = document.getElementById('an-fecha-egr').value;
+  const peso    = parseFloat(document.getElementById('an-peso-egr').value) || 0;
+  const precio  = parseFloat(document.getElementById('an-precio-egr').value) || 0;
+  const notas   = document.getElementById('an-notas-egr').value.trim();
+
+  // Validar cliente contra tabla (solo la 1ra vez del lote)
+  if (egresosLote.length === 0) {
     const okCliente = await validarYAgregarRef(cliente, clientes, 'Clientes',
       () => COL.clientes().add({ nombre: cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' })
     );
@@ -3300,25 +3390,70 @@ async function egresarAnimal() {
     cliente,
     notasEgreso: notas,
   };
-  COL.animales().doc(animal.id).update(data).then(() => {
-    resetAnimalEgr();
-    toast(`✅ Caravana ${caravana} egresada · stock actualizado`, '#14532d');
-  }).catch(() => toast('❌ Error al egresar.'));
+  try {
+    await COL.animales().doc(animal.id).update(data);
+    egresosLote.push({ id: animal.id, caravana });
+    actualizarContadorEgreso();
+    renderEgresosLote();
+
+    // Limpiar y reabrir cámara
+    document.getElementById('confirma-egreso').style.display = 'none';
+    document.getElementById('an-caravana-egr').value = '';
+    document.getElementById('an-foto-egr').value = '';
+    document.getElementById('an-preview-egr').style.display = 'none';
+    document.getElementById('an-ocr-status-egr').innerHTML = '';
+
+    const esperada = parseInt(document.getElementById('an-cantidad-egr').value) || 0;
+    if (esperada > 0 && egresosLote.length >= esperada) {
+      toast(`✅ ${caravana} egresado · tanda completa (${egresosLote.length}/${esperada})`, '#14532d');
+    } else {
+      toast(`✅ ${caravana} egresado · abriendo cámara…`, '#14532d');
+      setTimeout(() => document.getElementById('an-foto-egr').click(), 400);
+    }
+  } catch(e) {
+    toast('❌ Error al egresar.');
+  }
 }
 
-function resetAnimalEgr() {
-  document.getElementById('an-caravana-egr').value = '';
+async function deshacerUltimoEgreso() {
+  if (egresosLote.length === 0) return;
+  const ultimo = egresosLote[egresosLote.length - 1];
+  if (!confirm(`¿Deshacer el último egreso (${ultimo.caravana})? La caravana vuelve a stock.`)) return;
+  try {
+    await COL.animales().doc(ultimo.id).update({
+      estado: 'En stock',
+      fechaEgreso: firebase.firestore.FieldValue.delete(),
+      pesoEgreso: firebase.firestore.FieldValue.delete(),
+      precio: firebase.firestore.FieldValue.delete(),
+      cliente: firebase.firestore.FieldValue.delete(),
+      notasEgreso: firebase.firestore.FieldValue.delete(),
+    });
+    egresosLote.pop();
+    actualizarContadorEgreso();
+    renderEgresosLote();
+    toast(`↶ ${ultimo.caravana} vuelve a stock`);
+  } catch(e) { toast('❌ Error al deshacer'); }
+}
+
+function reiniciarEgreso() {
+  if (egresosLote.length && !confirm(`¿Reiniciar el egreso? Los ${egresosLote.length} animales ya egresados quedan así, pero arrancás una tanda nueva.`)) return;
+  egresosLote = [];
+  document.getElementById('an-cantidad-egr').value = '';
+  document.getElementById('an-cliente-egr').value = '';
   document.getElementById('an-peso-egr').value = '';
   document.getElementById('an-precio-egr').value = '';
-  document.getElementById('an-cliente-egr').value = '';
   document.getElementById('an-notas-egr').value = '';
-  document.getElementById('an-foto-egr').value = '';
-  document.getElementById('an-preview-egr').style.display = 'none';
-  document.getElementById('an-ocr-status-egr').innerHTML = 'Tocá "Abrir cámara" para sacar la foto.';
-  document.getElementById('an-match-egr').innerHTML = '';
   document.getElementById('an-fecha-egr').value = todayISO();
-  cerrarCamara('egr');
+  cancelarEgreso();
+  actualizarContadorEgreso();
+  renderEgresosLote();
+  toast('🔄 Egreso reiniciado');
 }
+
+// Legacy — mantenido por compatibilidad
+function buscarAnimalEgreso() { validarCaravanaEgreso(); }
+function resetAnimalEgr() { reiniciarEgreso(); }
+function egresarAnimal() { confirmarEgreso(); }
 
 function deleteAnimal(id) {
   COL.animales().doc(id).delete().then(() => toast('🗑️ Animal eliminado'))
