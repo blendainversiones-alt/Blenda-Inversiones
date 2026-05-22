@@ -3964,33 +3964,65 @@ function parsePrecioAR(txt) {
   return parseFloat((txt || '').replace(/[^0-9,]/g, '').replace(',', '.')) || 0;
 }
 
+const PRECIOS_MANUAL_KEY = 'blenda_precios_manual_v1';
+const PRECIOS_CACHE_KEY  = 'blenda_precios_cache_v1';
+
+function getPreciosManuales() {
+  try { return JSON.parse(localStorage.getItem(PRECIOS_MANUAL_KEY) || '{}'); } catch(e) { return {}; }
+}
+function setPrecioManual(producto, valor) {
+  const m = getPreciosManuales();
+  m[producto] = parseFloat(valor) || 0;
+  localStorage.setItem(PRECIOS_MANUAL_KEY, JSON.stringify(m));
+  // Aplicar inmediatamente
+  if (m[producto] > 0) {
+    preciosCot[producto] = { ars: m[producto], usd: null, label: producto, fuente: 'Manual' };
+  }
+  actualizarValorizacion();
+  renderDashStockCards();
+  cargarCotizaciones();
+}
+
 async function cargarCotizaciones() {
   const grid = document.getElementById('cotizaciones-grid');
   if (!grid) return;
   grid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⏳ Cargando precios pizarra…</div>`;
 
   // ── Intentar BCR (Cámara Arbitral de Cereales de Rosario) ──
+  let fuenteUsada = '';
+  let mercadoCerrado = false;
+  let precios = {};
   try {
     const resBCR = await fetch('https://api.codetabs.com/v1/proxy/?quest=https://www.cac.bcr.com.ar/es/precios-de-pizarra');
     if (!resBCR.ok) throw new Error('BCR no disponible');
     const html = await resBCR.text();
     const doc  = new DOMParser().parseFromString(html, 'text/html');
 
-    const precios = {};
-    doc.querySelectorAll('.board').forEach(board => {
-      const h3  = board.querySelector('h3');
-      const priceEl = board.querySelector('.price');
-      if (!h3 || !priceEl) return;
-      const nombre = h3.textContent.trim().toLowerCase()
-        .normalize('NFD').replace(/[̀-ͯ]/g, '');   // quita tildes
-      const ars = parsePrecioAR(priceEl.textContent);
-      if (!ars) return;
-      if (nombre.includes('soja'))              precios['Soja']  = ars;
-      else if (nombre.includes('maiz') || nombre.includes('maíz')) precios['Maíz']  = ars;
-      else if (nombre.includes('trigo'))         precios['Trigo'] = ars;
-    });
+    // Detectar si BCR avisa que no hay datos del día (fin de semana / feriado)
+    if (/no se han podido recuperar los datos|mercado cerrado/i.test(html)) {
+      mercadoCerrado = true;
+    }
+
+    // Probar varios selectores (estructura BCR cambia con el tiempo)
+    const selectores = ['.board', '.board-prices .board', '.board-prices', '.precios-board', '.price-board'];
+    for (const sel of selectores) {
+      doc.querySelectorAll(sel).forEach(board => {
+        const h3  = board.querySelector('h3, h4, .title, .producto');
+        const priceEl = board.querySelector('.price, .precio, .valor');
+        if (!h3 || !priceEl) return;
+        const nombre = h3.textContent.trim().toLowerCase()
+          .normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const ars = parsePrecioAR(priceEl.textContent);
+        if (!ars) return;
+        if (nombre.includes('soja'))              precios['Soja']  = ars;
+        else if (nombre.includes('maiz') || nombre.includes('maíz')) precios['Maíz']  = ars;
+        else if (nombre.includes('trigo'))         precios['Trigo'] = ars;
+      });
+      if (Object.keys(precios).length) break;
+    }
 
     if (!Object.keys(precios).length) throw new Error('Sin precios parseados');
+    fuenteUsada = 'Pizarra Rosario BCR';
 
     // Tipo de cambio (para mostrar referencia USD)
     let usdARS = null;
@@ -4023,58 +4055,106 @@ async function cargarCotizaciones() {
         <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
         <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
       </div>
-    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 Fuente: Pizarra Rosario BCR · dolarapi.com<br>🕐 ${hora}</div>`;
+    `).join('') + renderEditorPreciosManual() + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">📍 Fuente: ${fuenteUsada} · 🕐 ${hora}</div>`;
+
+    // Cachear los precios para próximas cargas (si el mercado cierra)
+    try { localStorage.setItem(PRECIOS_CACHE_KEY, JSON.stringify({ precios, fecha: new Date().toISOString() })); } catch(e) {}
 
     actualizarValorizacion();
     return; // éxito — salir
 
   } catch(eBCR) {
-    console.warn('BCR falló, usando Yahoo Finance como respaldo:', eBCR.message);
+    console.warn('BCR falló:', eBCR.message);
   }
 
-  // ── Fallback: Yahoo Finance (CBOT) ──
+  // ── Fallback 1: usar último cache local (si el mercado está cerrado) ──
   try {
-    const resDolar = await fetch('https://dolarapi.com/v1/dolares/oficial');
-    const dolarData = await resDolar.json();
-    const usdARS = dolarData.venta || 1;
+    const cache = JSON.parse(localStorage.getItem(PRECIOS_CACHE_KEY) || 'null');
+    if (cache && cache.precios && Object.keys(cache.precios).length) {
+      const fechaCache = new Date(cache.fecha);
+      const dias = Math.floor((Date.now() - fechaCache.getTime()) / 86400000);
+      preciosCot = {};
+      // Aplicar overrides manuales si existen
+      const manuales = getPreciosManuales();
+      Object.entries(cache.precios).forEach(([k, ars]) => {
+        preciosCot[k] = { ars: manuales[k] > 0 ? manuales[k] : ars, usd: null, label: k, fuente: manuales[k] > 0 ? 'Manual' : 'Última pizarra' };
+      });
+      // Agregar productos que solo tienen valor manual
+      Object.entries(manuales).forEach(([k, ars]) => {
+        if (ars > 0 && !preciosCot[k]) preciosCot[k] = { ars, usd: null, label: k, fuente: 'Manual' };
+      });
 
-    const granos = [
-      { key:'Soja',  ticker:'ZS=F', bpt:36.7437 },
-      { key:'Maíz',  ticker:'ZC=F', bpt:39.3683 },
-      { key:'Trigo', ticker:'ZW=F', bpt:36.7437 },
-    ];
-    const precios = {};
-    await Promise.all(granos.map(async g => {
-      try {
-        const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${g.ticker}?interval=1d&range=1d`);
-        const d = await r.json();
-        const pUSD = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
-        if (pUSD) precios[g.key] = { usd: pUSD/g.bpt, ars: (pUSD/g.bpt)*usdARS, label: g.key };
-      } catch(e) {}
-    }));
+      const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+      const fechaTxt = fechaCache.toLocaleDateString('es-AR');
+      const items = Object.entries(preciosCot).map(([k, v]) => ({
+        label: `${ICONOS[k]||''} ${k}`,
+        valor: `$${fmtNum(Math.round(v.ars))}/tn`,
+        sub:   v.fuente === 'Manual' ? '✏️ Manual' : `Último: ${fechaTxt}`,
+      }));
+      const aviso = mercadoCerrado
+        ? '⚠️ <strong>Mercado cerrado</strong> (sábado, domingo o feriado) — mostrando último precio de pizarra.'
+        : `⚠️ No se pudieron actualizar los precios online — usando último cache del ${fechaTxt}.`;
+      grid.innerHTML =
+        `<div style="grid-column:1/-1;background:#fef3c7;border:1.5px solid #fbbf24;color:#78350f;padding:.6rem .85rem;border-radius:8px;font-size:.78rem;margin-bottom:.5rem">${aviso}</div>` +
+        items.map(it => `
+          <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
+            <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
+            <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
+            <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
+          </div>
+        `).join('') + renderEditorPreciosManual();
+      actualizarValorizacion();
+      return;
+    }
+  } catch(e) { console.warn('Cache falló:', e.message); }
 
-    preciosCot = precios;
-    const hora = new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
-    const items = [
-      { label:'💵 Dólar oficial', valor:`$${fmtNum(Math.round(usdARS))}`, sub:'por USD' },
-      ...Object.values(precios).map(p => ({
-        label: `${ICONOS[p.label]||''} ${p.label}`,
-        valor: `$${fmtNum(Math.round(p.ars))}/tn`,
-        sub:   `≈ USD ${fmtNum(Math.round(p.usd))} · CBOT`,
-      })),
-    ];
-    grid.innerHTML = items.map(it => `
-      <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
-        <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${it.label}</div>
-        <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">${it.valor}</div>
-        <div style="font-size:.68rem;color:var(--gray)">${it.sub}</div>
-      </div>
-    `).join('') + `<div style="font-size:.68rem;color:#9ca3af;display:flex;align-items:flex-end;padding-bottom:.4rem">⚠️ Respaldo CBOT · 🕐 ${hora}</div>`;
+  // ── Fallback 2: solo precios manuales si existen ──
+  const manuales = getPreciosManuales();
+  if (Object.keys(manuales).filter(k => manuales[k] > 0).length > 0) {
+    preciosCot = {};
+    Object.entries(manuales).forEach(([k, ars]) => {
+      if (ars > 0) preciosCot[k] = { ars, usd: null, label: k, fuente: 'Manual' };
+    });
+    grid.innerHTML =
+      `<div style="grid-column:1/-1;background:#fef3c7;border:1.5px solid #fbbf24;color:#78350f;padding:.6rem .85rem;border-radius:8px;font-size:.78rem;margin-bottom:.5rem">⚠️ Sin conexión a BCR. Usando solo precios manuales.</div>` +
+      Object.entries(preciosCot).map(([k, v]) => `
+        <div style="background:var(--gray-light);border-radius:8px;padding:.75rem 1rem;text-align:center">
+          <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.25rem">${ICONOS[k]||''} ${k}</div>
+          <div style="font-size:1.15rem;font-weight:800;color:var(--green-dark)">$${fmtNum(Math.round(v.ars))}/tn</div>
+          <div style="font-size:.68rem;color:var(--gray)">✏️ Manual</div>
+        </div>
+      `).join('') + renderEditorPreciosManual();
     actualizarValorizacion();
-
-  } catch(e) {
-    grid.innerHTML = `<div style="color:var(--gray);font-size:.82rem;padding:.5rem">⚠️ No se pudieron cargar las cotizaciones. Revisá la conexión.</div>`;
+    return;
   }
+
+  // ── Sin precios disponibles ──
+  grid.innerHTML =
+    `<div style="grid-column:1/-1;background:#fee2e2;border:1.5px solid #f87171;color:#7f1d1d;padding:.75rem 1rem;border-radius:8px;font-size:.85rem;margin-bottom:.5rem">⚠️ No se pudieron cargar precios. Cargalos manualmente abajo y la app sigue funcionando normal.</div>` +
+    renderEditorPreciosManual();
+}
+
+// Renderiza editor manual de precios (siempre visible al final del grid)
+function renderEditorPreciosManual() {
+  const m = getPreciosManuales();
+  return `
+    <div style="grid-column:1/-1;margin-top:.6rem;border-top:1px dashed var(--border);padding-top:.6rem">
+      <div style="font-size:.72rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.5rem">✏️ Cargar precio manual ($/tn) — sobreescribe la pizarra</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem">
+        ${GRANOS.map(p => `
+          <div style="display:flex;flex-direction:column;gap:.2rem">
+            <label style="font-size:.72rem;font-weight:600;color:#4b5563">${ICONOS[p]||''} ${p}</label>
+            <div style="display:flex;align-items:center;gap:.3rem">
+              <span style="font-size:.8rem;color:var(--gray)">$</span>
+              <input type="number" min="0" step="any" value="${m[p]||''}" placeholder="0"
+                style="width:100%;padding:.35rem .5rem;border:1.5px solid var(--border);border-radius:6px;font-size:.85rem;background:#fff"
+                onchange="setPrecioManual('${p}', this.value)" />
+              <span style="font-size:.72rem;color:var(--gray);white-space:nowrap">/tn</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
 }
 
 const GRANOS = ['Maíz','Soja','Trigo'];
