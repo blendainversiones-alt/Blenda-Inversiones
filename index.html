@@ -389,6 +389,7 @@
   <div class="tab" onclick="showPage('stock', this)">📥 Ingresos</div>
   <div class="tab" onclick="showPage('salidas', this)">📤 Egresos</div>
   <div class="tab" onclick="showPage('resumen', this)">📈 Resumen</div>
+  <div class="tab" onclick="showPage('siembra', this)">🌱 Siembra</div>
   <div class="tab" onclick="showPage('tablas', this)">📋 Tablas</div>
   <div class="tab" onclick="showPage('notas', this)">📝 Notas</div>
 </nav>
@@ -741,6 +742,176 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SIEMBRA ═══════════════════════════════ -->
+<div class="page" id="page-siembra">
+  <div class="container">
+
+    <!-- KPIs -->
+    <div class="card">
+      <h2>🌱 Plan de siembra</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Planificá la campaña por lote: hectáreas, cultivo, rinde estimado y estado.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-top:.5rem" id="siembra-kpis"></div>
+    </div>
+
+    <!-- Formulario -->
+    <div class="card">
+      <h2>➕ Nuevo plan</h2>
+      <form id="form-siembra">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="si-campania">Campaña *</label>
+            <input id="si-campania" type="text" placeholder="Ej: 2024/25 — Soja" required />
+          </div>
+          <div class="form-group">
+            <label for="si-cultivo">Cultivo *</label>
+            <select id="si-cultivo" required>
+              <option value="">— Seleccionar —</option>
+              <option value="Maíz">🌽 Maíz</option>
+              <option value="Soja">🌿 Soja</option>
+              <option value="Trigo">🌾 Trigo</option>
+              <option value="Girasol">🌻 Girasol</option>
+              <option value="Sorgo">🌾 Sorgo</option>
+              <option value="Cebada">🌾 Cebada</option>
+              <option value="Otro">📦 Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="si-campo">Campo / Lote *</label>
+            <input id="si-campo" type="text" placeholder="Ej: Campo Norte, Lote 3" list="lista-campos-siembra" required />
+            <datalist id="lista-campos-siembra"></datalist>
+          </div>
+          <div class="form-group">
+            <label for="si-hectareas">Hectáreas *</label>
+            <input id="si-hectareas" type="number" min="0" step="any" placeholder="0" required />
+          </div>
+          <div class="form-group">
+            <label for="si-variedad">Variedad / Híbrido</label>
+            <input id="si-variedad" type="text" placeholder="Ej: DK7220, NK842" />
+          </div>
+          <div class="form-group">
+            <label for="si-rinde">Rinde estimado (tn/ha)</label>
+            <input id="si-rinde" type="number" min="0" step="any" placeholder="Ej: 3.5" />
+          </div>
+          <div class="form-group">
+            <label for="si-fecha-siembra">Fecha siembra</label>
+            <input id="si-fecha-siembra" type="date" />
+          </div>
+          <div class="form-group">
+            <label for="si-fecha-cosecha">Fecha cosecha estimada</label>
+            <input id="si-fecha-cosecha" type="date" />
+          </div>
+          <div class="form-group">
+            <label for="si-estado">Estado</label>
+            <select id="si-estado">
+              <option value="Planificado">📋 Planificado</option>
+              <option value="Sembrado">🌱 Sembrado</option>
+              <option value="En desarrollo">🌾 En desarrollo</option>
+              <option value="Cosechado">✅ Cosechado</option>
+            </select>
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label for="si-notas">Notas</label>
+            <textarea id="si-notas" placeholder="Tratamientos, observaciones, costos…"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary" onclick="resetSiembra()">Limpiar</button>
+          <button type="submit" class="btn btn-primary">Guardar plan</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Listado -->
+    <div class="card">
+      <h2>📋 Planes registrados</h2>
+      <div class="toolbar">
+        <input id="si-search" type="search" placeholder="Buscar campaña, campo, cultivo…" oninput="renderSiembras()" />
+        <select id="si-filter-cultivo" onchange="renderSiembras()" style="width:auto;min-width:140px">
+          <option value="">Todos los cultivos</option>
+          <option value="Maíz">Maíz</option>
+          <option value="Soja">Soja</option>
+          <option value="Trigo">Trigo</option>
+          <option value="Girasol">Girasol</option>
+          <option value="Sorgo">Sorgo</option>
+          <option value="Cebada">Cebada</option>
+          <option value="Otro">Otro</option>
+        </select>
+        <select id="si-filter-estado" onchange="renderSiembras()" style="width:auto;min-width:140px">
+          <option value="">Todos los estados</option>
+          <option value="Planificado">Planificado</option>
+          <option value="Sembrado">Sembrado</option>
+          <option value="En desarrollo">En desarrollo</option>
+          <option value="Cosechado">Cosechado</option>
+        </select>
+        <button class="btn btn-blue btn-sm" onclick="exportSiembrasCSV()">Exportar CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Campaña</th>
+              <th>Cultivo</th>
+              <th>Campo</th>
+              <th>Has</th>
+              <th>Variedad</th>
+              <th>Rinde tn/ha</th>
+              <th>Producción est.</th>
+              <th>Siembra</th>
+              <th>Cosecha est.</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-siembras"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal editar siembra -->
+<div class="modal-backdrop" id="modal-siembra">
+  <div class="modal">
+    <h3>✏️ Editar plan de siembra</h3>
+    <form id="form-edit-siembra">
+      <div class="form-grid">
+        <div class="form-group"><label>Campaña *</label><input id="esi-campania" type="text" required /></div>
+        <div class="form-group"><label>Cultivo *</label>
+          <select id="esi-cultivo" required>
+            <option value="Maíz">🌽 Maíz</option>
+            <option value="Soja">🌿 Soja</option>
+            <option value="Trigo">🌾 Trigo</option>
+            <option value="Girasol">🌻 Girasol</option>
+            <option value="Sorgo">🌾 Sorgo</option>
+            <option value="Cebada">🌾 Cebada</option>
+            <option value="Otro">📦 Otro</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Campo / Lote *</label><input id="esi-campo" type="text" required /></div>
+        <div class="form-group"><label>Hectáreas *</label><input id="esi-hectareas" type="number" min="0" step="any" required /></div>
+        <div class="form-group"><label>Variedad / Híbrido</label><input id="esi-variedad" type="text" /></div>
+        <div class="form-group"><label>Rinde estimado (tn/ha)</label><input id="esi-rinde" type="number" min="0" step="any" /></div>
+        <div class="form-group"><label>Fecha siembra</label><input id="esi-fecha-siembra" type="date" /></div>
+        <div class="form-group"><label>Fecha cosecha estimada</label><input id="esi-fecha-cosecha" type="date" /></div>
+        <div class="form-group"><label>Estado</label>
+          <select id="esi-estado">
+            <option value="Planificado">📋 Planificado</option>
+            <option value="Sembrado">🌱 Sembrado</option>
+            <option value="En desarrollo">🌾 En desarrollo</option>
+            <option value="Cosechado">✅ Cosechado</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1"><label>Notas</label><textarea id="esi-notas"></textarea></div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('modal-siembra')">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -1282,9 +1453,10 @@ let clientes    = [];
 let notas       = [];
 let campos      = [];
 let proveedores = [];
+let siembras    = [];
 
 // Contadores para saber cuándo todos los listeners cargaron por primera vez
-let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false };
+let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false, siembras: false };
 
 function checkLoaded() {
   return Object.values(_loaded).every(Boolean);
@@ -1327,6 +1499,12 @@ db.collection('proveedores').orderBy('nombre','asc').onSnapshot(snap => {
   if (checkLoaded()) renderAll();
 });
 
+db.collection('siembras').onSnapshot(snap => {
+  siembras = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  _loaded.siembras = true;
+  if (checkLoaded()) renderAll();
+});
+
 // ── helpers Firestore ──
 const COL = {
   salidas:     () => db.collection('salidas'),
@@ -1335,6 +1513,7 @@ const COL = {
   notas:       () => db.collection('notas'),
   campos:      () => db.collection('campos'),
   proveedores: () => db.collection('proveedores'),
+  siembras:    () => db.collection('siembras'),
 };
 
 const PRODUCTOS = ['Maíz','Soja','Trigo','Hacienda Engorde','Hacienda Recría','Otro'];
@@ -2239,6 +2418,178 @@ function exportResumenCSV() {
 }
 
 // ═══════════════════════════════════════════
+//  PLAN DE SIEMBRA
+// ═══════════════════════════════════════════
+
+const SIEMBRA_ICONOS = { 'Maíz':'🌽','Soja':'🌿','Trigo':'🌾','Girasol':'🌻','Sorgo':'🌾','Cebada':'🌾','Otro':'📦' };
+const SIEMBRA_BADGE = { 'Planificado':'b-gray','Sembrado':'b-amber','En desarrollo':'b-blue','Cosechado':'b-green' };
+
+let editSiembraId = null;
+
+document.getElementById('form-siembra').addEventListener('submit', async e => {
+  e.preventDefault();
+  const campoStr = document.getElementById('si-campo').value.trim();
+
+  // Validar campo contra tabla
+  const okCampo = await validarYAgregarRef(campoStr, campos, 'Campos',
+    () => COL.campos().add({ nombre: campoStr, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
+  );
+  if (!okCampo) return;
+
+  const rec = {
+    campania:     document.getElementById('si-campania').value.trim(),
+    cultivo:      document.getElementById('si-cultivo').value,
+    campo:        campoStr,
+    hectareas:    parseFloat(document.getElementById('si-hectareas').value) || 0,
+    variedad:     document.getElementById('si-variedad').value.trim(),
+    rinde:        parseFloat(document.getElementById('si-rinde').value) || 0,
+    fechaSiembra: document.getElementById('si-fecha-siembra').value,
+    fechaCosecha: document.getElementById('si-fecha-cosecha').value,
+    estado:       document.getElementById('si-estado').value,
+    notas:        document.getElementById('si-notas').value.trim(),
+    creadoEn:     firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  COL.siembras().add(rec).then(() => {
+    resetSiembra();
+    toast('✅ Plan de siembra guardado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+});
+
+function resetSiembra() {
+  document.getElementById('form-siembra').reset();
+}
+
+function renderSiembras() {
+  // Datalist de campos para el formulario de siembra
+  const optsCampos = [...new Set(campos.map(c => c.nombre))].map(n => `<option value="${esc(n)}">`).join('');
+  const dl = document.getElementById('lista-campos-siembra');
+  if (dl) dl.innerHTML = optsCampos;
+
+  // KPIs
+  const totalHas    = siembras.reduce((s, r) => s + (parseFloat(r.hectareas)||0), 0);
+  const totalProd   = siembras.reduce((s, r) => s + ((parseFloat(r.hectareas)||0) * (parseFloat(r.rinde)||0)), 0);
+  const planActivos = siembras.filter(r => r.estado !== 'Cosechado').length;
+  const cosechados  = siembras.filter(r => r.estado === 'Cosechado').length;
+
+  const kpisEl = document.getElementById('siembra-kpis');
+  if (kpisEl) {
+    kpisEl.innerHTML = `
+      <div style="background:var(--green-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.4px">Total hectáreas</div>
+        <div style="font-size:1.3rem;font-weight:800;color:var(--green-dark);margin-top:.25rem">${fmtNum(totalHas)} ha</div>
+      </div>
+      <div style="background:#dbeafe;border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:#1e40af;text-transform:uppercase;letter-spacing:.4px">Producción estimada</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#1e3a8a;margin-top:.25rem">${fmtNum(Math.round(totalProd))} tn</div>
+      </div>
+      <div style="background:var(--amber-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--amber);text-transform:uppercase;letter-spacing:.4px">En curso</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#92400e;margin-top:.25rem">${planActivos}</div>
+      </div>
+      <div style="background:var(--gray-light);border-radius:8px;padding:.85rem 1rem;text-align:center">
+        <div style="font-size:.7rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Cosechados</div>
+        <div style="font-size:1.3rem;font-weight:800;color:var(--gray-dark);margin-top:.25rem">${cosechados}</div>
+      </div>
+    `;
+  }
+
+  // Tabla filtrada
+  const q     = (document.getElementById('si-search')?.value || '').toLowerCase();
+  const fCult = document.getElementById('si-filter-cultivo')?.value || '';
+  const fEst  = document.getElementById('si-filter-estado')?.value || '';
+
+  const rows = siembras.filter(r => {
+    const match = !q || [r.campania,r.cultivo,r.campo,r.variedad,r.notas].some(v => String(v||'').toLowerCase().includes(q));
+    return match && (!fCult || r.cultivo === fCult) && (!fEst || r.estado === fEst);
+  }).sort((a,b) => (b.fechaSiembra||'').localeCompare(a.fechaSiembra||''));
+
+  const tbody = document.getElementById('tabla-siembras');
+  if (!tbody) return;
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" class="empty-msg">No hay planes de siembra cargados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const has   = parseFloat(r.hectareas)||0;
+    const rind  = parseFloat(r.rinde)||0;
+    const prod  = has * rind;
+    return `
+    <tr>
+      <td><strong>${esc(r.campania||'')}</strong></td>
+      <td>${SIEMBRA_ICONOS[r.cultivo]||''} ${esc(r.cultivo||'')}</td>
+      <td><span class="badge b-green">📍 ${esc(r.campo||'')}</span></td>
+      <td>${fmtNum(has)}</td>
+      <td style="color:var(--gray);font-size:.82rem">${esc(r.variedad||'—')}</td>
+      <td>${rind ? fmtNum(rind) : '—'}</td>
+      <td><strong>${prod ? fmtNum(Math.round(prod))+' tn' : '—'}</strong></td>
+      <td>${r.fechaSiembra ? fmtDate(r.fechaSiembra) : '—'}</td>
+      <td>${r.fechaCosecha ? fmtDate(r.fechaCosecha) : '—'}</td>
+      <td><span class="badge ${SIEMBRA_BADGE[r.estado]||'b-gray'}">${esc(r.estado||'')}</span></td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="openEditSiembra('${r.id}')">Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmarEliminar(()=>deleteSiembra('${r.id}'))">🗑️</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openEditSiembra(id) {
+  const r = siembras.find(x => x.id === id);
+  if (!r) return;
+  editSiembraId = id;
+  document.getElementById('esi-campania').value     = r.campania||'';
+  document.getElementById('esi-cultivo').value      = r.cultivo||'';
+  document.getElementById('esi-campo').value        = r.campo||'';
+  document.getElementById('esi-hectareas').value    = r.hectareas||'';
+  document.getElementById('esi-variedad').value     = r.variedad||'';
+  document.getElementById('esi-rinde').value        = r.rinde||'';
+  document.getElementById('esi-fecha-siembra').value = r.fechaSiembra||'';
+  document.getElementById('esi-fecha-cosecha').value = r.fechaCosecha||'';
+  document.getElementById('esi-estado').value       = r.estado||'Planificado';
+  document.getElementById('esi-notas').value        = r.notas||'';
+  document.getElementById('modal-siembra').classList.add('open');
+}
+
+document.getElementById('form-edit-siembra').addEventListener('submit', e => {
+  e.preventDefault();
+  if (!editSiembraId) return;
+  const data = {
+    campania:     document.getElementById('esi-campania').value.trim(),
+    cultivo:      document.getElementById('esi-cultivo').value,
+    campo:        document.getElementById('esi-campo').value.trim(),
+    hectareas:    parseFloat(document.getElementById('esi-hectareas').value) || 0,
+    variedad:     document.getElementById('esi-variedad').value.trim(),
+    rinde:        parseFloat(document.getElementById('esi-rinde').value) || 0,
+    fechaSiembra: document.getElementById('esi-fecha-siembra').value,
+    fechaCosecha: document.getElementById('esi-fecha-cosecha').value,
+    estado:       document.getElementById('esi-estado').value,
+    notas:        document.getElementById('esi-notas').value.trim(),
+  };
+  COL.siembras().doc(editSiembraId).update(data).then(() => {
+    closeModal('modal-siembra');
+    toast('✅ Plan actualizado', '#14532d');
+  }).catch(() => toast('❌ Error al guardar.'));
+});
+
+function deleteSiembra(id) {
+  COL.siembras().doc(id).delete().then(() => toast('🗑️ Plan eliminado'))
+    .catch(() => toast('❌ Error al eliminar.'));
+}
+
+function exportSiembrasCSV() {
+  if (!siembras.length) { toast('No hay planes para exportar'); return; }
+  const cols = ['Campaña','Cultivo','Campo','Hectáreas','Variedad','Rinde tn/ha','Producción estimada tn','Fecha siembra','Fecha cosecha','Estado','Notas'];
+  const data = siembras.map(r => {
+    const prod = (parseFloat(r.hectareas)||0) * (parseFloat(r.rinde)||0);
+    return [r.campania,r.cultivo,r.campo,r.hectareas,r.variedad,r.rinde,prod,r.fechaSiembra,r.fechaCosecha,r.estado,r.notas]
+      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(',');
+  });
+  downloadCSV([cols.join(','), ...data].join('\r\n'), `siembras_blenda_${todayISO()}.csv`);
+  toast('📄 CSV exportado');
+}
+
+// ═══════════════════════════════════════════
 //  RENDER ALL
 // ═══════════════════════════════════════════
 
@@ -2251,6 +2602,7 @@ function renderAll() {
   renderClientes();
   renderCampos();
   renderProveedores();
+  renderSiembras();
   renderNotas();
   actualizarValorizacion();
 }
