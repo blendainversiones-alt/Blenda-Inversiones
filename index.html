@@ -1042,9 +1042,90 @@
       </form>
     </div>
 
-    <!-- Egresar animal -->
+    <!-- 1. Datos del egreso por jaula -->
     <div class="card" style="border-left:4px solid #7c3aed">
-      <h2>📤 Egresar animal</h2>
+      <h2>🚚 Egresar jaula completa</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Datos comunes de la venta. Después escaneás cada caravana — el sistema valida que esté en stock antes de egresarla.</p>
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="ej-cliente">Cliente / Destino *</label>
+          <input id="ej-cliente" type="text" placeholder="Cliente" list="lista-clientes-eg" />
+        </div>
+        <div class="form-group">
+          <label for="ej-fecha">📅 Fecha egreso</label>
+          <input id="ej-fecha" type="date" />
+        </div>
+        <div class="form-group">
+          <label for="ej-patente">🚛 Patente del camión</label>
+          <input id="ej-patente" type="text" placeholder="Ej: AB 123 CD" style="text-transform:uppercase" />
+        </div>
+        <div class="form-group">
+          <label for="ej-cantidad">🔢 Cantidad esperada</label>
+          <input id="ej-cantidad" type="number" min="0" step="1" placeholder="Ej: 30" oninput="actualizarContadorEgresoJaula()" />
+        </div>
+        <div class="form-group">
+          <label for="ej-peso-prom">⚖️ Peso prom. salida (kg/cab)</label>
+          <input id="ej-peso-prom" type="number" min="0" step="any" placeholder="Ej: 460" />
+        </div>
+        <div class="form-group">
+          <label for="ej-precio">💰 Precio $/kg</label>
+          <input id="ej-precio" type="number" min="0" step="any" placeholder="Ej: 4800" />
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label for="ej-notas">📝 Notas del egreso</label>
+          <textarea id="ej-notas" placeholder="Remito, observaciones…"></textarea>
+        </div>
+      </div>
+      <div class="form-actions" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <a href="javascript:void(0)" onclick="reiniciarEgresoJaula()" style="font-size:.8rem;color:var(--gray);text-decoration:underline">🔄 Reiniciar egreso</a>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button type="button" class="btn btn-secondary" onclick="iniciarCargaManualEgreso()">✏️ Cargar a mano</button>
+          <button type="button" class="btn btn-primary" style="background:#7c3aed" onclick="iniciarCapturaEgreso()">📥 Egresar con cámara 📷</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Escanear caravanas a egresar -->
+    <div class="card" style="border-left:4px solid #7c3aed">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <h2 style="margin:0">📷 Escanear caravanas a egresar</h2>
+        <span id="contador-egreso-jaula" style="font-size:1rem;font-weight:800;color:#5b21b6;background:#ede9fe;padding:.35rem .85rem;border-radius:99px">0 / 0</span>
+      </div>
+      <p style="font-size:.85rem;color:var(--gray);margin:.6rem 0">Cada caravana se valida contra el stock. Si no está en stock o ya salió, te avisa.</p>
+
+      <input id="ej-foto" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCREgreso(this.files[0])" />
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <button type="button" class="btn btn-primary" style="font-size:1rem;padding:.85rem 1.2rem;flex:1;min-width:160px;background:#7c3aed" onclick="iniciarCapturaEgreso()">📷 Tomar foto</button>
+        <button type="button" class="btn btn-secondary" style="font-size:1rem;padding:.85rem 1.2rem;flex:1;min-width:160px" onclick="iniciarCargaManualEgreso()">✏️ A mano</button>
+      </div>
+
+      <div id="ej-ocr-status" style="font-size:.82rem;color:var(--gray);margin-top:.6rem"></div>
+      <img id="ej-preview" style="display:none;width:100%;max-height:260px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
+
+      <!-- Caja de confirmación -->
+      <div id="ej-confirma" style="display:none;margin-top:.75rem;border-radius:10px;padding:.85rem">
+        <div id="ej-confirma-titulo" style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem"></div>
+        <input id="ej-caravana" type="text" style="font-size:1.2rem;font-weight:800;padding:.6rem;width:100%;text-align:center" placeholder="N° caravana" oninput="validarCaravanaEnStock()" />
+        <div id="ej-confirma-info" style="font-size:.85rem;margin-top:.5rem"></div>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+          <button type="button" id="ej-btn-confirmar" class="btn btn-primary" style="flex:1;font-size:.95rem;padding:.7rem;background:#7c3aed" onclick="confirmarEgresoJaula()">✅ Egresar y siguiente</button>
+          <button type="button" class="btn btn-secondary" onclick="cancelarCaravanaEgreso()">Descartar</button>
+        </div>
+      </div>
+
+      <!-- Lista de caravanas egresadas -->
+      <div id="ej-lista-wrap" style="display:none;margin-top:1rem;border-top:1px solid var(--border);padding-top:.8rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span style="font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Egresadas en esta tanda</span>
+          <button type="button" class="btn btn-danger btn-sm" onclick="deshacerUltimoEgresoJaula()">↶ Deshacer última</button>
+        </div>
+        <div id="ej-lista" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
+      </div>
+    </div>
+
+    <!-- Egresar animal manual (alternativa) -->
+    <div class="card" style="border-left:4px solid #7c3aed">
+      <h2>📤 Egresar animal manual (alternativa)</h2>
       <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Escribí el N° de caravana del animal que sale. Se valida que esté en stock antes de egresar.</p>
       <form id="form-engorde-egr">
         <div class="form-grid">
@@ -1664,6 +1745,9 @@ let animales    = [];
 // Variables del flujo "jaula" — declaradas acá arriba para evitar ReferenceError
 let jaulaActual = [];   // [{ id, caravana }]
 let jaulaIdActual = null;
+let egresoJaulaActual = [];   // [{ id, caravana }]
+let egresoJaulaId = null;
+let modoCargaEgreso = 'camara';   // 'camara' o 'manual'
 
 // Contadores para saber cuándo todos los listeners cargaron por primera vez
 let _loaded = { salidas: false, ingresos: false, clientes: false, notas: false, campos: false, proveedores: false, siembras: false, animales: false };
@@ -3041,6 +3125,251 @@ function reiniciarJaula() {
   actualizarContadorJaula();
   renderJaulaActual();
   toast('🔄 Jaula reiniciada');
+}
+
+// ═══════════════════════════════════════════
+//  EGRESO POR JAULA
+// ═══════════════════════════════════════════
+
+(function initFechaEgresoJaula(){
+  const fj = document.getElementById('ej-fecha');
+  if (fj) fj.value = todayISO();
+})();
+
+function actualizarContadorEgresoJaula() {
+  const el = document.getElementById('contador-egreso-jaula');
+  if (!el) return;
+  const esperada = parseInt(document.getElementById('ej-cantidad')?.value) || 0;
+  const cargada = egresoJaulaActual.length;
+  let bg = '#ede9fe', color = '#5b21b6';
+  if (esperada > 0 && cargada > esperada) { bg = 'var(--red-light)'; color = '#7f1d1d'; }
+  else if (esperada > 0 && cargada === esperada) { bg = '#7c3aed'; color = '#fff'; }
+  el.style.background = bg;
+  el.style.color = color;
+  el.textContent = esperada > 0 ? `${cargada} / ${esperada}` : `${cargada}`;
+}
+
+function renderEgresoJaulaActual() {
+  const wrap = document.getElementById('ej-lista-wrap');
+  const list = document.getElementById('ej-lista');
+  if (!wrap || !list) return;
+  if (egresoJaulaActual.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = egresoJaulaActual.map(c =>
+    `<span style="background:#fff;border:1.5px solid #7c3aed;border-radius:99px;padding:.3rem .7rem;font-size:.82rem;font-weight:700;color:#5b21b6">📤 ${esc(c.caravana)}</span>`
+  ).join('');
+}
+
+function validarDatosEgresoJaula() {
+  const cliente = document.getElementById('ej-cliente')?.value.trim();
+  const fecha   = document.getElementById('ej-fecha')?.value;
+  if (!cliente) { toast('⚠️ Cargá el cliente'); return false; }
+  if (!fecha)   { toast('⚠️ Cargá la fecha de egreso'); return false; }
+  if (!egresoJaulaId) egresoJaulaId = 'egreso_' + Date.now();
+  return true;
+}
+
+function iniciarCapturaEgreso() {
+  if (!validarDatosEgresoJaula()) return;
+  modoCargaEgreso = 'camara';
+  const fi = document.getElementById('ej-foto');
+  if (fi) fi.click();
+}
+
+function iniciarCargaManualEgreso() {
+  if (!validarDatosEgresoJaula()) return;
+  modoCargaEgreso = 'manual';
+  const statusEl = document.getElementById('ej-ocr-status');
+  const prev     = document.getElementById('ej-preview');
+  if (statusEl) statusEl.innerHTML = '✏️ Modo manual — escribí el N° de caravana abajo';
+  if (prev) prev.style.display = 'none';
+  mostrarConfirmacionEgresoJaula('');
+}
+
+async function procesarFotoOCREgreso(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('ej-ocr-status');
+  const prev     = document.getElementById('ej-preview');
+  if (!statusEl || !prev) return;
+
+  prev.src = URL.createObjectURL(file);
+  prev.style.display = 'block';
+  statusEl.innerHTML = '⏳ Leyendo caravana…';
+
+  if (typeof Tesseract === 'undefined') {
+    statusEl.innerHTML = '⚠️ OCR no disponible. Cargá el N° a mano.';
+    mostrarConfirmacionEgresoJaula('');
+    return;
+  }
+
+  try {
+    const result = await Tesseract.recognize(file, 'eng', {
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+      tessedit_pageseg_mode: '7',
+    });
+    const text = (result?.data?.text || '').toUpperCase().replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    let detectado = '';
+    const m1 = text.match(/[A-Z]{1,4}\s?\d{2,6}/);
+    const m2 = text.match(/\d{3,7}/);
+    if (m1) detectado = m1[0];
+    else if (m2) detectado = m2[0];
+
+    if (detectado) {
+      statusEl.innerHTML = `✅ Detectado: <strong>${esc(detectado)}</strong> <small style="color:var(--gray)">— corregilo si está mal</small>`;
+    } else {
+      statusEl.innerHTML = '⚠️ No se detectó número. Escribilo a mano abajo.';
+    }
+    mostrarConfirmacionEgresoJaula(detectado);
+  } catch(e) {
+    console.warn('OCR error:', e);
+    statusEl.innerHTML = '⚠️ Error al leer la foto. Cargá el N° a mano.';
+    mostrarConfirmacionEgresoJaula('');
+  }
+}
+
+function mostrarConfirmacionEgresoJaula(numero) {
+  const input = document.getElementById('ej-caravana');
+  const box   = document.getElementById('ej-confirma');
+  const titulo = document.getElementById('ej-confirma-titulo');
+  if (!input || !box) return;
+  input.value = numero || '';
+  box.style.display = 'block';
+  if (titulo) titulo.textContent = 'Caravana — confirmá o corregí';
+  validarCaravanaEnStock();
+  setTimeout(() => input.focus(), 150);
+}
+
+function validarCaravanaEnStock() {
+  const car  = document.getElementById('ej-caravana')?.value.trim();
+  const info = document.getElementById('ej-confirma-info');
+  const btn  = document.getElementById('ej-btn-confirmar');
+  const cont = document.getElementById('ej-confirma');
+  if (!info || !btn || !cont) return;
+  if (!car) { info.innerHTML = ''; btn.disabled = false; cont.style.background='#ede9fe'; cont.style.border='1.5px solid #7c3aed'; return; }
+
+  const enStock = animales.find(x => (x.caravana||'').trim() === car && x.estado === 'En stock');
+  if (enStock) {
+    info.innerHTML = `<span style="color:var(--green-dark);font-weight:600">✅ EN STOCK</span> · ingreso ${fmtDate(enStock.fechaIngreso)} · ${fmtNum(enStock.pesoIngreso)} kg · 📍 ${esc(enStock.campo)}`;
+    cont.style.background = 'var(--green-light)';
+    cont.style.border = '1.5px solid var(--green)';
+    btn.disabled = false;
+  } else {
+    const ya = animales.find(x => (x.caravana||'').trim() === car && x.estado === 'Egresado');
+    if (ya) info.innerHTML = `<span style="color:var(--amber)">⚠️ YA EGRESADA</span> el ${fmtDate(ya.fechaEgreso)} a ${esc(ya.cliente||'—')}`;
+    else    info.innerHTML = `<span style="color:var(--red);font-weight:600">❌ NO está en stock</span> · revisá el N° o cargala primero como ingreso`;
+    cont.style.background = '#fee2e2';
+    cont.style.border = '1.5px solid var(--red)';
+    btn.disabled = true;
+  }
+}
+
+function cancelarCaravanaEgreso() {
+  const input = document.getElementById('ej-caravana');
+  const box   = document.getElementById('ej-confirma');
+  const fi    = document.getElementById('ej-foto');
+  const prev  = document.getElementById('ej-preview');
+  const stat  = document.getElementById('ej-ocr-status');
+  if (input) input.value = '';
+  if (box)   box.style.display = 'none';
+  if (fi)    fi.value = '';
+  if (prev)  prev.style.display = 'none';
+  if (stat)  stat.innerHTML = '';
+}
+
+async function confirmarEgresoJaula() {
+  const car = document.getElementById('ej-caravana')?.value.trim();
+  if (!car) { toast('⚠️ Cargá el N° de caravana'); return; }
+
+  const animal = animales.find(a => (a.caravana||'').trim() === car && a.estado === 'En stock');
+  if (!animal) { toast(`❌ La caravana ${car} no está en stock`); return; }
+
+  const cliente = document.getElementById('ej-cliente')?.value.trim();
+  const fecha   = document.getElementById('ej-fecha')?.value;
+  const patente = (document.getElementById('ej-patente')?.value || '').trim().toUpperCase();
+  const peso    = parseFloat(document.getElementById('ej-peso-prom')?.value) || 0;
+  const precio  = parseFloat(document.getElementById('ej-precio')?.value) || 0;
+  const notas   = document.getElementById('ej-notas')?.value.trim();
+
+  // Validar cliente contra tabla (1ra vez)
+  if (egresoJaulaActual.length === 0) {
+    const okCliente = await validarYAgregarRef(cliente, clientes, 'Clientes',
+      () => COL.clientes().add({ nombre: cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' })
+    );
+    if (!okCliente) return;
+  }
+
+  const data = {
+    estado: 'Egresado',
+    fechaEgreso: fecha || todayISO(),
+    pesoEgreso: peso,
+    precio,
+    cliente,
+    patenteEgreso: patente,
+    notasEgreso: notas,
+    egresoJaulaId,
+  };
+  try {
+    await COL.animales().doc(animal.id).update(data);
+    egresoJaulaActual.push({ id: animal.id, caravana: car });
+    actualizarContadorEgresoJaula();
+    renderEgresoJaulaActual();
+    cancelarCaravanaEgreso();
+
+    const esperada = parseInt(document.getElementById('ej-cantidad')?.value) || 0;
+    if (esperada > 0 && egresoJaulaActual.length >= esperada) {
+      toast(`✅ ${car} · tanda completa (${egresoJaulaActual.length}/${esperada})`, '#14532d');
+    } else {
+      toast(`✅ ${car} egresada · listo para la próxima`, '#14532d');
+      setTimeout(() => {
+        if (modoCargaEgreso === 'camara') {
+          const fi = document.getElementById('ej-foto');
+          if (fi) fi.click();
+        } else {
+          const statusEl = document.getElementById('ej-ocr-status');
+          if (statusEl) statusEl.innerHTML = '✏️ Modo manual — escribí el N° de caravana abajo';
+          mostrarConfirmacionEgresoJaula('');
+        }
+      }, 350);
+    }
+  } catch(e) {
+    console.warn(e);
+    toast('❌ Error al egresar.');
+  }
+}
+
+async function deshacerUltimoEgresoJaula() {
+  if (egresoJaulaActual.length === 0) return;
+  const ultima = egresoJaulaActual[egresoJaulaActual.length - 1];
+  if (!confirm(`¿Deshacer el último egreso (${ultima.caravana})? La caravana vuelve a stock.`)) return;
+  try {
+    await COL.animales().doc(ultima.id).update({
+      estado: 'En stock',
+      fechaEgreso: firebase.firestore.FieldValue.delete(),
+      pesoEgreso: firebase.firestore.FieldValue.delete(),
+      precio: firebase.firestore.FieldValue.delete(),
+      cliente: firebase.firestore.FieldValue.delete(),
+      patenteEgreso: firebase.firestore.FieldValue.delete(),
+      notasEgreso: firebase.firestore.FieldValue.delete(),
+      egresoJaulaId: firebase.firestore.FieldValue.delete(),
+    });
+    egresoJaulaActual.pop();
+    actualizarContadorEgresoJaula();
+    renderEgresoJaulaActual();
+    toast(`↶ ${ultima.caravana} vuelve a stock`);
+  } catch(e) { toast('❌ Error al deshacer'); }
+}
+
+function reiniciarEgresoJaula() {
+  if (egresoJaulaActual.length && !confirm(`¿Reiniciar el egreso? Los ${egresoJaulaActual.length} animales ya egresados quedan así, pero arrancás una tanda nueva.`)) return;
+  egresoJaulaActual = [];
+  egresoJaulaId = null;
+  const ids = ['ej-cliente','ej-patente','ej-cantidad','ej-peso-prom','ej-precio','ej-notas'];
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const fj = document.getElementById('ej-fecha'); if (fj) fj.value = todayISO();
+  cancelarCaravanaEgreso();
+  actualizarContadorEgresoJaula();
+  renderEgresoJaulaActual();
+  toast('🔄 Egreso reiniciado');
 }
 
 // ── Ingresar animal ──
