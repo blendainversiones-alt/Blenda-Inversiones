@@ -1095,8 +1095,19 @@
 
       <input id="ej-foto" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCREgreso(this.files[0])" />
       <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <button type="button" class="btn btn-primary" style="font-size:1rem;padding:.85rem 1.2rem;flex:1;min-width:160px;background:#7c3aed" onclick="iniciarCapturaEgreso()">📷 Tomar foto</button>
-        <button type="button" class="btn btn-secondary" style="font-size:1rem;padding:.85rem 1.2rem;flex:1;min-width:160px" onclick="iniciarCargaManualEgreso()">✏️ A mano</button>
+        <button type="button" class="btn btn-primary" style="font-size:.95rem;padding:.8rem 1rem;flex:1;min-width:140px;background:#7c3aed" onclick="iniciarCapturaEgreso()">📷 Tomar foto</button>
+        <button type="button" class="btn btn-secondary" style="font-size:.95rem;padding:.8rem 1rem;flex:1;min-width:140px" onclick="iniciarCargaManualEgreso()">✏️ A mano</button>
+        <button type="button" class="btn btn-secondary" style="font-size:.95rem;padding:.8rem 1rem;flex:1;min-width:140px;background:#dbeafe;color:#1e3a8a;border-color:#93c5fd" onclick="abrirSelectorStock()">🔍 Elegir de stock</button>
+      </div>
+
+      <!-- Selector de caravanas en stock -->
+      <div id="ej-stock-picker" style="display:none;margin-top:.75rem;background:#f0f9ff;border:1.5px solid #93c5fd;border-radius:10px;padding:.85rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.6rem">
+          <span style="font-size:.78rem;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:.4px">🔍 Tocá una caravana para egresarla</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="cerrarSelectorStock()">Cerrar</button>
+        </div>
+        <input id="ej-stock-buscar" type="search" placeholder="Buscar caravana, campo…" oninput="renderSelectorStock()" style="width:100%;margin-bottom:.5rem" />
+        <div id="ej-stock-list" style="display:flex;flex-wrap:wrap;gap:.4rem;max-height:280px;overflow-y:auto"></div>
       </div>
 
       <div id="ej-ocr-status" style="font-size:.82rem;color:var(--gray);margin-top:.6rem"></div>
@@ -3359,6 +3370,105 @@ async function deshacerUltimoEgresoJaula() {
   } catch(e) { toast('❌ Error al deshacer'); }
 }
 
+// ── Selector de caravanas en stock ──
+function abrirSelectorStock() {
+  if (!validarDatosEgresoJaula()) return;
+  modoCargaEgreso = 'picker';
+  const picker = document.getElementById('ej-stock-picker');
+  if (picker) picker.style.display = 'block';
+  // Cierro caja de confirmación si estaba abierta
+  const confirma = document.getElementById('ej-confirma');
+  if (confirma) confirma.style.display = 'none';
+  renderSelectorStock();
+  // Scroll
+  picker?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function cerrarSelectorStock() {
+  const picker = document.getElementById('ej-stock-picker');
+  if (picker) picker.style.display = 'none';
+}
+
+function renderSelectorStock() {
+  const list = document.getElementById('ej-stock-list');
+  if (!list) return;
+  const q = (document.getElementById('ej-stock-buscar')?.value || '').toLowerCase();
+  // Caravanas en stock que NO están ya en el egreso actual
+  const yaEgresadasEnTanda = new Set(egresoJaulaActual.map(e => e.caravana));
+  const enStock = animales.filter(a =>
+    a.categoria === 'Hacienda Engorde' &&
+    a.estado === 'En stock' &&
+    !yaEgresadasEnTanda.has(a.caravana)
+  );
+  const filtradas = !q ? enStock : enStock.filter(a =>
+    [a.caravana,a.campo,a.proveedor].some(v => String(v||'').toLowerCase().includes(q))
+  );
+
+  if (filtradas.length === 0) {
+    list.innerHTML = `<div style="color:var(--gray);font-size:.85rem;padding:.5rem;width:100%;text-align:center">${enStock.length === 0 ? 'No hay animales en stock' : 'Sin resultados para tu búsqueda'}</div>`;
+    return;
+  }
+
+  list.innerHTML = filtradas
+    .sort((a,b) => (a.caravana||'').localeCompare(b.caravana||''))
+    .map(a => `
+      <button type="button" onclick="egresarDesdeStock('${a.id}','${esc(a.caravana||'').replace(/'/g,"\\'")}')"
+        style="background:#fff;border:1.5px solid var(--green);border-radius:99px;padding:.45rem .85rem;font-size:.82rem;font-weight:700;color:var(--green-dark);cursor:pointer;display:inline-flex;align-items:center;gap:.3rem">
+        🐄 ${esc(a.caravana||'')}
+        <small style="font-weight:500;color:var(--gray);font-size:.7rem">· ${fmtNum(a.pesoIngreso||0)}kg</small>
+      </button>
+    `).join('');
+}
+
+async function egresarDesdeStock(animalId, caravana) {
+  const animal = animales.find(a => a.id === animalId);
+  if (!animal || animal.estado !== 'En stock') {
+    toast(`❌ ${caravana} ya no está en stock`);
+    renderSelectorStock();
+    return;
+  }
+  const cliente = document.getElementById('ej-cliente')?.value.trim();
+  const fecha   = document.getElementById('ej-fecha')?.value;
+  const patente = (document.getElementById('ej-patente')?.value || '').trim().toUpperCase();
+  const peso    = parseFloat(document.getElementById('ej-peso-prom')?.value) || 0;
+  const precio  = parseFloat(document.getElementById('ej-precio')?.value) || 0;
+  const notas   = document.getElementById('ej-notas')?.value.trim();
+
+  // Validar cliente contra tabla (1ra vez)
+  if (egresoJaulaActual.length === 0) {
+    const okCliente = await validarYAgregarRef(cliente, clientes, 'Clientes',
+      () => COL.clientes().add({ nombre: cliente, cuit:'', tel:'', email:'', localidad:'', notas:'' })
+    );
+    if (!okCliente) return;
+  }
+
+  const data = {
+    estado: 'Egresado',
+    fechaEgreso: fecha || todayISO(),
+    pesoEgreso: peso,
+    precio,
+    cliente,
+    patenteEgreso: patente,
+    notasEgreso: notas,
+    egresoJaulaId,
+  };
+  try {
+    await COL.animales().doc(animalId).update(data);
+    egresoJaulaActual.push({ id: animalId, caravana });
+    actualizarContadorEgresoJaula();
+    renderEgresoJaulaActual();
+    renderSelectorStock();
+    toast(`✅ ${caravana} egresada`, '#14532d');
+
+    const esperada = parseInt(document.getElementById('ej-cantidad')?.value) || 0;
+    if (esperada > 0 && egresoJaulaActual.length >= esperada) {
+      toast(`✅ Tanda completa (${egresoJaulaActual.length}/${esperada})`, '#14532d');
+    }
+  } catch(e) {
+    toast('❌ Error al egresar');
+  }
+}
+
 function reiniciarEgresoJaula() {
   if (egresoJaulaActual.length && !confirm(`¿Reiniciar el egreso? Los ${egresoJaulaActual.length} animales ya egresados quedan así, pero arrancás una tanda nueva.`)) return;
   egresoJaulaActual = [];
@@ -3505,6 +3615,10 @@ function renderEngorde() {
   const dlC = document.getElementById('lista-campos-eg');     if (dlC) dlC.innerHTML = optsCampos;
   const dlP = document.getElementById('lista-proveedores-eg'); if (dlP) dlP.innerHTML = optsProv;
   const dlL = document.getElementById('lista-clientes-eg');   if (dlL) dlL.innerHTML = optsCliente;
+
+  // Si el selector de stock está abierto, refrescarlo
+  const picker = document.getElementById('ej-stock-picker');
+  if (picker && picker.style.display !== 'none') renderSelectorStock();
 
   // KPIs (solo Engorde)
   const engorde = animales.filter(a => a.categoria === 'Hacienda Engorde');
