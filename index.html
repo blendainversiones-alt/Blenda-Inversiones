@@ -967,8 +967,10 @@
       </div>
       <div class="form-actions">
         <button type="button" class="btn btn-secondary" onclick="resetAnimalIng()">Limpiar</button>
-        <button type="button" class="btn btn-primary" onclick="guardarAnimal()">Guardar animal</button>
+        <button type="button" class="btn btn-secondary" onclick="guardarAnimal(false)">Guardar</button>
+        <button type="button" class="btn btn-primary" onclick="guardarAnimal(true)" style="font-size:.95rem">💾 Guardar y siguiente 📷</button>
       </div>
+      <div id="cargados-sesion" style="margin-top:.6rem;font-size:.8rem;color:var(--green-dark);font-weight:600;display:none"></div>
     </div>
 
     <!-- Egresar animal -->
@@ -2973,12 +2975,11 @@ async function procesarFotoOCR(file, tipo) {
 
     // Probamos varias combinaciones de imagen × modo PSM y elegimos el mejor candidato.
     // PSM 6 = bloque uniforme · 7 = línea única · 8 = palabra única · 11 = texto disperso · 13 = línea cruda
+    // 3 intentos rápidos — los más efectivos en pruebas
     const intentos = [
-      { img: normal,    psm: '7' },
-      { img: invertida, psm: '7' },
-      { img: normal,    psm: '6' },
-      { img: invertida, psm: '6' },
-      { img: normal,    psm: '11' },
+      { img: normal,    psm: '7' },   // línea única (mejor para caravanas)
+      { img: normal,    psm: '6' },   // bloque uniforme
+      { img: invertida, psm: '7' },   // fallback texto claro sobre oscuro
     ];
 
     const candidatos = [];
@@ -3044,7 +3045,10 @@ async function procesarFotoOCR(file, tipo) {
   }
 }
 
-async function guardarAnimal() {
+// Contador de animales cargados en la sesión actual (se reinicia al recargar página)
+let cargadosSesion = 0;
+
+async function guardarAnimal(siguiente) {
   const caravana  = document.getElementById('an-caravana-ing').value.trim();
   const categoria = document.getElementById('an-categoria-ing').value;
   const peso      = parseFloat(document.getElementById('an-peso-ing').value) || 0;
@@ -3057,19 +3061,16 @@ async function guardarAnimal() {
   if (!peso)     { toast('⚠️ Cargá el peso de ingreso'); return; }
   if (!campo)    { toast('⚠️ Cargá el campo'); return; }
 
-  // Verificar duplicado activo
   const duplicado = animales.find(a => (a.caravana||'').trim() === caravana && a.estado === 'En stock');
   if (duplicado) {
     if (!confirm(`Ya hay un animal con caravana "${caravana}" en stock. ¿Cargar otro igual?`)) return;
   }
 
-  // Validar campo contra tabla
   const okCampo = await validarYAgregarRef(campo, campos, 'Campos',
     () => COL.campos().add({ nombre: campo, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
   );
   if (!okCampo) return;
 
-  // Validar proveedor si está cargado
   if (proveedor) {
     const okProv = await validarYAgregarRef(proveedor, proveedores, 'Proveedores',
       () => COL.proveedores().add({ nombre: proveedor, cuit:'', tel:'', email:'', localidad:'', rubro:'', notas:'' })
@@ -3087,10 +3088,32 @@ async function guardarAnimal() {
     notas,
     creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
   };
-  COL.animales().add(rec).then(() => {
-    resetAnimalIng();
-    toast('✅ Animal cargado · stock actualizado', '#14532d');
-  }).catch(() => toast('❌ Error al guardar.'));
+  try {
+    await COL.animales().add(rec);
+    cargadosSesion++;
+    const cs = document.getElementById('cargados-sesion');
+    if (cs) {
+      cs.style.display = 'block';
+      cs.innerHTML = `✅ Cargados en esta sesión: <strong>${cargadosSesion}</strong> animal${cargadosSesion>1?'es':''}`;
+    }
+    if (siguiente) {
+      // Limpiar SOLO caravana, peso y notas — mantener campo/proveedor/fecha
+      document.getElementById('an-caravana-ing').value = '';
+      document.getElementById('an-peso-ing').value = '';
+      document.getElementById('an-notas-ing').value = '';
+      document.getElementById('an-foto-ing').value = '';
+      document.getElementById('an-preview-ing').style.display = 'none';
+      document.getElementById('an-ocr-status-ing').innerHTML = '';
+      toast(`✅ ${caravana} cargado · abriendo cámara para el siguiente…`, '#14532d');
+      // Abrir cámara automáticamente después de un instante
+      setTimeout(() => document.getElementById('an-foto-ing').click(), 350);
+    } else {
+      resetAnimalIng();
+      toast('✅ Animal cargado · stock actualizado', '#14532d');
+    }
+  } catch(e) {
+    toast('❌ Error al guardar.');
+  }
 }
 
 function resetAnimalIng() {
@@ -3101,9 +3124,8 @@ function resetAnimalIng() {
   document.getElementById('an-notas-ing').value = '';
   document.getElementById('an-foto-ing').value = '';
   document.getElementById('an-preview-ing').style.display = 'none';
-  document.getElementById('an-ocr-status-ing').innerHTML = 'Tocá "Abrir cámara" para sacar la foto. El N° se detecta automáticamente.';
+  document.getElementById('an-ocr-status-ing').innerHTML = '';
   document.getElementById('an-fecha-ing').value = todayISO();
-  cerrarCamara('ing');
 }
 
 function buscarAnimalEgreso() {
