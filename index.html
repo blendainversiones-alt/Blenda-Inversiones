@@ -927,50 +927,77 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1rem" id="animales-kpis"></div>
     </div>
 
-    <!-- Cargar ingreso -->
+    <!-- 1. Datos del lote -->
     <div class="card">
-      <h2>📥 Ingresar animal (foto caravana)</h2>
+      <h2>📋 Datos del lote / jaula</h2>
+      <p style="font-size:.85rem;color:var(--gray);margin-bottom:1rem">Cargá una sola vez los datos comunes a todos los animales que vas a ingresar.</p>
       <div class="form-grid">
-        <div class="form-group" style="grid-column:1/-1">
-          <input id="an-foto-ing" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'ing')" />
-          <button type="button" class="btn btn-primary" style="font-size:1rem;padding:.85rem 1.5rem;width:100%;max-width:320px" onclick="document.getElementById('an-foto-ing').click()">📷 Tomar foto de caravana <small style="opacity:.6">v3</small></button>
-          <div id="an-ocr-status-ing" style="font-size:.78rem;color:var(--gray);margin-top:.5rem"></div>
-          <img id="an-preview-ing" style="display:none;width:100%;max-height:360px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
-        </div>
-        <div class="form-group">
-          <label for="an-caravana-ing">N° de caravana *</label>
-          <input id="an-caravana-ing" type="text" placeholder="Ej: 1234" required />
-        </div>
-        <input id="an-categoria-ing" type="hidden" value="Hacienda Engorde" />
-        <div class="form-group">
-          <label for="an-peso-ing">Peso ingreso (kg) *</label>
-          <input id="an-peso-ing" type="number" min="0" step="any" placeholder="Ej: 380" required />
-        </div>
         <div class="form-group">
           <label for="an-campo-ing">Campo / Lote *</label>
           <input id="an-campo-ing" type="text" placeholder="Ej: Campo Norte" list="lista-campos-an" required />
           <datalist id="lista-campos-an"></datalist>
         </div>
         <div class="form-group">
-          <label for="an-proveedor-ing">Proveedor (opcional)</label>
-          <input id="an-proveedor-ing" type="text" placeholder="Si es compra" list="lista-proveedores-an" />
+          <label for="an-proveedor-ing">Proveedor (si es compra)</label>
+          <input id="an-proveedor-ing" type="text" placeholder="Nombre del proveedor" list="lista-proveedores-an" />
           <datalist id="lista-proveedores-an"></datalist>
         </div>
         <div class="form-group">
-          <label for="an-fecha-ing">Fecha ingreso</label>
-          <input id="an-fecha-ing" type="date" />
+          <label for="an-fecha-ing">Fecha ingreso *</label>
+          <input id="an-fecha-ing" type="date" required />
+        </div>
+        <div class="form-group">
+          <label for="an-peso-ing">Peso promedio (kg/cab) *</label>
+          <input id="an-peso-ing" type="number" min="0" step="any" placeholder="Ej: 380" required />
+        </div>
+        <div class="form-group">
+          <label for="an-cantidad-esp">Cantidad esperada (cabezas)</label>
+          <input id="an-cantidad-esp" type="number" min="0" step="1" placeholder="Ej: 50" oninput="actualizarContadorLote()" />
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label for="an-notas-ing">Notas</label>
-          <textarea id="an-notas-ing" placeholder="Observaciones del animal…"></textarea>
+          <label for="an-notas-ing">Notas del lote</label>
+          <textarea id="an-notas-ing" placeholder="Observaciones generales del lote…"></textarea>
         </div>
       </div>
-      <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="resetAnimalIng()">Limpiar</button>
-        <button type="button" class="btn btn-secondary" onclick="guardarAnimal(false)">Guardar</button>
-        <button type="button" class="btn btn-primary" onclick="guardarAnimal(true)" style="font-size:.95rem">💾 Guardar y siguiente 📷</button>
+      <div class="form-actions" style="justify-content:flex-end">
+        <button type="button" class="btn btn-secondary" onclick="reiniciarLote()">🔄 Reiniciar lote</button>
       </div>
-      <div id="cargados-sesion" style="margin-top:.6rem;font-size:.8rem;color:var(--green-dark);font-weight:600;display:none"></div>
+    </div>
+
+    <!-- 2. Cargar caravanas en cadena -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+        <h2 style="margin:0">📷 Escanear caravanas</h2>
+        <span id="contador-lote" style="font-size:1rem;font-weight:800;color:var(--green-dark);background:var(--green-light);padding:.35rem .85rem;border-radius:99px">0 / 0</span>
+      </div>
+      <p style="font-size:.85rem;color:var(--gray);margin:.6rem 0">Sacale foto a la caravana de cada animal. El N° se detecta y se agrega solo. Si está mal, corregís antes de confirmar.</p>
+
+      <input id="an-foto-ing" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'ing')" />
+      <button type="button" class="btn btn-primary" style="font-size:1.05rem;padding:1rem 1.5rem;width:100%" onclick="iniciarCapturaCaravana()">📷 Tomar foto de caravana <small style="opacity:.6">v4</small></button>
+
+      <div id="an-ocr-status-ing" style="font-size:.85rem;color:var(--gray);margin-top:.6rem"></div>
+      <img id="an-preview-ing" style="display:none;width:100%;max-height:280px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
+
+      <!-- Caja de confirmación de caravana detectada -->
+      <div id="confirma-caravana" style="display:none;margin-top:.75rem;background:var(--green-light);border:1.5px solid var(--green);border-radius:10px;padding:.85rem">
+        <div style="font-size:.78rem;color:var(--green-dark);font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:.4rem">Caravana detectada</div>
+        <input id="an-caravana-ing" type="text" style="font-size:1.25rem;font-weight:800;padding:.65rem;width:100%;text-align:center" placeholder="N° caravana" />
+        <div style="display:flex;gap:.5rem;margin-top:.6rem;flex-wrap:wrap">
+          <button type="button" class="btn btn-primary" style="flex:1;font-size:1rem;padding:.8rem" onclick="confirmarCaravana()">✅ Confirmar y siguiente</button>
+          <button type="button" class="btn btn-secondary" onclick="cancelarCaravana()">Descartar</button>
+        </div>
+      </div>
+
+      <input id="an-categoria-ing" type="hidden" value="Hacienda Engorde" />
+
+      <!-- Lista de caravanas cargadas en el lote actual -->
+      <div id="caravanas-lote-wrap" style="display:none;margin-top:1rem;border-top:1px solid var(--border);padding-top:.8rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <span style="font-size:.78rem;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.4px">Cargadas en este lote</span>
+          <button type="button" class="btn btn-danger btn-sm" onclick="borrarUltimaCaravana()">↶ Deshacer última</button>
+        </div>
+        <div id="caravanas-lote-list" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
+      </div>
     </div>
 
     <!-- Egresar animal -->
@@ -1029,6 +1056,7 @@
           <option value="Egresado">Egresados</option>
         </select>
         <button class="btn btn-blue btn-sm" onclick="exportAnimalesCSV()">Exportar CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="exportarSenasa()" style="background:#0891b2">📑 Reporte SENASA</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -2755,6 +2783,8 @@ function exportSiembrasCSV() {
 // Inicializar fechas
 document.getElementById('an-fecha-ing').value = todayISO();
 document.getElementById('an-fecha-egr').value = todayISO();
+// Inicializar contador del lote
+actualizarContadorLote();
 
 // ── Cámara en vivo (getUserMedia) ──
 const camStreams = { ing: null, egr: null };
@@ -3025,7 +3055,6 @@ async function procesarFotoOCR(file, tipo) {
       });
       const ranking = Object.entries(score).map(([valor, s]) => ({
         valor,
-        // Patrones con letras+números pesan más (es lo más típico en caravanas)
         peso: s.veces * (valor.includes(' ') ? 200 : 100) * valor.length + s.confTotal,
       })).sort((a,b) => b.peso - a.peso);
 
@@ -3033,11 +3062,20 @@ async function procesarFotoOCR(file, tipo) {
       const otros = ranking.slice(1, 4).map(r => r.valor);
       inputEl.value = mejor;
       statusEl.innerHTML = `✅ Detectado: <strong style="font-size:1rem">${mejor}</strong>` +
-        (otros.length ? ` <small style="color:var(--gray)">· otros: ${otros.join(', ')}</small>` : '') +
-        ` <small style="color:var(--gray)">— corregilo si no es correcto</small>`;
-      if (tipo === 'egr') buscarAnimalEgreso();
+        (otros.length ? ` <small style="color:var(--gray)">· otros: ${otros.join(', ')}</small>` : '');
+
+      if (tipo === 'ing') {
+        // Mostrar caja de confirmación para flujo en cadena
+        mostrarConfirmacionCaravana(mejor);
+      } else if (tipo === 'egr') {
+        buscarAnimalEgreso();
+      }
     } else {
-      statusEl.innerHTML = `⚠️ No se detectó caravana. <small style="color:var(--gray)">Tips: acercate más, buena luz directa (sin sombras), caravana derecha. O cargalo a mano.</small>`;
+      statusEl.innerHTML = `⚠️ No se detectó caravana. <small style="color:var(--gray)">Tocá nuevamente la foto y cargá el N° a mano.</small>`;
+      if (tipo === 'ing') {
+        // Mostrar la caja igual para que pueda cargar a mano
+        mostrarConfirmacionCaravana('');
+      }
     }
   } catch (e) {
     console.warn('OCR error:', e);
@@ -3045,87 +3083,176 @@ async function procesarFotoOCR(file, tipo) {
   }
 }
 
-// Contador de animales cargados en la sesión actual (se reinicia al recargar página)
-let cargadosSesion = 0;
+// Lote actual: lista de IDs de animales cargados en esta sesión de carga
+let loteActual = [];   // [{ id, caravana }]
+let loteIdActual = null;  // identificador único del lote actual
 
-async function guardarAnimal(siguiente) {
-  const caravana  = document.getElementById('an-caravana-ing').value.trim();
-  const categoria = document.getElementById('an-categoria-ing').value;
-  const peso      = parseFloat(document.getElementById('an-peso-ing').value) || 0;
+function actualizarContadorLote() {
+  const esperada = parseInt(document.getElementById('an-cantidad-esp').value) || 0;
+  const cargada  = loteActual.length;
+  const el = document.getElementById('contador-lote');
+  if (!el) return;
+  let color = 'var(--green-dark)', bg = 'var(--green-light)';
+  if (esperada > 0 && cargada > esperada) { color = '#7f1d1d'; bg = 'var(--red-light)'; }
+  else if (esperada > 0 && cargada === esperada) { color = '#fff'; bg = 'var(--green)'; }
+  el.style.color = color;
+  el.style.background = bg;
+  el.textContent = esperada > 0 ? `${cargada} / ${esperada}` : `${cargada}`;
+}
+
+function renderCaravanasLote() {
+  const wrap = document.getElementById('caravanas-lote-wrap');
+  const list = document.getElementById('caravanas-lote-list');
+  if (!wrap || !list) return;
+  if (loteActual.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = loteActual.map(c =>
+    `<span style="background:#fff;border:1.5px solid var(--green);border-radius:99px;padding:.3rem .7rem;font-size:.82rem;font-weight:700;color:var(--green-dark)">🐄 ${esc(c.caravana)}</span>`
+  ).join('');
+}
+
+function iniciarCapturaCaravana() {
+  // Validar que el lote esté configurado
+  const campo = document.getElementById('an-campo-ing').value.trim();
+  const fecha = document.getElementById('an-fecha-ing').value;
+  const peso  = parseFloat(document.getElementById('an-peso-ing').value) || 0;
+  if (!campo) { toast('⚠️ Cargá el Campo del lote arriba'); return; }
+  if (!fecha) { toast('⚠️ Cargá la fecha del lote arriba'); return; }
+  if (!peso)  { toast('⚠️ Cargá el peso promedio del lote arriba'); return; }
+  // Asignar loteId si todavía no hay uno
+  if (!loteIdActual) loteIdActual = 'lote_' + Date.now();
+  // Abrir la cámara
+  document.getElementById('an-foto-ing').click();
+}
+
+function mostrarConfirmacionCaravana(numero) {
+  document.getElementById('an-caravana-ing').value = numero;
+  document.getElementById('confirma-caravana').style.display = 'block';
+}
+
+function cancelarCaravana() {
+  document.getElementById('confirma-caravana').style.display = 'none';
+  document.getElementById('an-caravana-ing').value = '';
+  document.getElementById('an-foto-ing').value = '';
+  document.getElementById('an-preview-ing').style.display = 'none';
+  document.getElementById('an-ocr-status-ing').innerHTML = '';
+}
+
+async function confirmarCaravana() {
+  const caravana = document.getElementById('an-caravana-ing').value.trim();
+  if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
+
   const campo     = document.getElementById('an-campo-ing').value.trim();
   const proveedor = document.getElementById('an-proveedor-ing').value.trim();
   const fecha     = document.getElementById('an-fecha-ing').value;
+  const peso      = parseFloat(document.getElementById('an-peso-ing').value) || 0;
   const notas     = document.getElementById('an-notas-ing').value.trim();
+  const categoria = 'Hacienda Engorde';
 
-  if (!caravana) { toast('⚠️ Cargá el N° de caravana'); return; }
-  if (!peso)     { toast('⚠️ Cargá el peso de ingreso'); return; }
-  if (!campo)    { toast('⚠️ Cargá el campo'); return; }
-
+  // Duplicado en stock
   const duplicado = animales.find(a => (a.caravana||'').trim() === caravana && a.estado === 'En stock');
   if (duplicado) {
-    if (!confirm(`Ya hay un animal con caravana "${caravana}" en stock. ¿Cargar otro igual?`)) return;
+    if (!confirm(`Ya hay un animal con caravana "${caravana}" en stock. ¿Cargar igual?`)) return;
   }
 
-  const okCampo = await validarYAgregarRef(campo, campos, 'Campos',
-    () => COL.campos().add({ nombre: campo, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
-  );
-  if (!okCampo) return;
-
-  if (proveedor) {
-    const okProv = await validarYAgregarRef(proveedor, proveedores, 'Proveedores',
-      () => COL.proveedores().add({ nombre: proveedor, cuit:'', tel:'', email:'', localidad:'', rubro:'', notas:'' })
+  // Validar campo/proveedor en tablas (solo la 1ra vez del lote)
+  if (loteActual.length === 0) {
+    const okCampo = await validarYAgregarRef(campo, campos, 'Campos',
+      () => COL.campos().add({ nombre: campo, tipo:'Propio', hectareas:0, ubicacion:'', propietario:'', vencimiento:'', notas:'' })
     );
-    if (!okProv) return;
+    if (!okCampo) return;
+    if (proveedor) {
+      const okProv = await validarYAgregarRef(proveedor, proveedores, 'Proveedores',
+        () => COL.proveedores().add({ nombre: proveedor, cuit:'', tel:'', email:'', localidad:'', rubro:'', notas:'' })
+      );
+      if (!okProv) return;
+    }
   }
 
   const rec = {
     caravana, categoria,
     pesoIngreso: peso,
-    campo,
-    proveedor,
+    campo, proveedor,
     fechaIngreso: fecha || todayISO(),
     estado: 'En stock',
     notas,
+    loteId: loteIdActual,
     creadoEn: firebase.firestore.FieldValue.serverTimestamp(),
   };
   try {
-    await COL.animales().add(rec);
-    cargadosSesion++;
-    const cs = document.getElementById('cargados-sesion');
-    if (cs) {
-      cs.style.display = 'block';
-      cs.innerHTML = `✅ Cargados en esta sesión: <strong>${cargadosSesion}</strong> animal${cargadosSesion>1?'es':''}`;
-    }
-    if (siguiente) {
-      // Limpiar SOLO caravana, peso y notas — mantener campo/proveedor/fecha
-      document.getElementById('an-caravana-ing').value = '';
-      document.getElementById('an-peso-ing').value = '';
-      document.getElementById('an-notas-ing').value = '';
-      document.getElementById('an-foto-ing').value = '';
-      document.getElementById('an-preview-ing').style.display = 'none';
-      document.getElementById('an-ocr-status-ing').innerHTML = '';
-      toast(`✅ ${caravana} cargado · abriendo cámara para el siguiente…`, '#14532d');
-      // Abrir cámara automáticamente después de un instante
-      setTimeout(() => document.getElementById('an-foto-ing').click(), 350);
+    const docRef = await COL.animales().add(rec);
+    loteActual.push({ id: docRef.id, caravana });
+    actualizarContadorLote();
+    renderCaravanasLote();
+
+    // Limpiar campos de captura y abrir cámara automáticamente
+    document.getElementById('confirma-caravana').style.display = 'none';
+    document.getElementById('an-caravana-ing').value = '';
+    document.getElementById('an-foto-ing').value = '';
+    document.getElementById('an-preview-ing').style.display = 'none';
+    document.getElementById('an-ocr-status-ing').innerHTML = '';
+
+    const esperada = parseInt(document.getElementById('an-cantidad-esp').value) || 0;
+    if (esperada > 0 && loteActual.length >= esperada) {
+      toast(`✅ ${caravana} cargado · lote completo (${loteActual.length}/${esperada})`, '#14532d');
     } else {
-      resetAnimalIng();
-      toast('✅ Animal cargado · stock actualizado', '#14532d');
+      toast(`✅ ${caravana} cargado · abriendo cámara…`, '#14532d');
+      setTimeout(() => document.getElementById('an-foto-ing').click(), 400);
     }
   } catch(e) {
+    console.warn(e);
     toast('❌ Error al guardar.');
   }
 }
 
-function resetAnimalIng() {
-  document.getElementById('an-caravana-ing').value = '';
-  document.getElementById('an-peso-ing').value = '';
-  document.getElementById('an-campo-ing').value = '';
-  document.getElementById('an-proveedor-ing').value = '';
+async function borrarUltimaCaravana() {
+  if (loteActual.length === 0) return;
+  const ultima = loteActual[loteActual.length - 1];
+  if (!confirm(`¿Borrar la última caravana cargada (${ultima.caravana})?`)) return;
+  try {
+    await COL.animales().doc(ultima.id).delete();
+    loteActual.pop();
+    actualizarContadorLote();
+    renderCaravanasLote();
+    toast(`🗑️ ${ultima.caravana} borrada del lote`);
+  } catch(e) { toast('❌ Error al borrar'); }
+}
+
+function reiniciarLote() {
+  if (loteActual.length && !confirm(`¿Reiniciar el lote? Los ${loteActual.length} animales ya cargados quedan guardados, pero se inicia un lote nuevo.`)) return;
+  loteActual = [];
+  loteIdActual = null;
+  document.getElementById('an-cantidad-esp').value = '';
   document.getElementById('an-notas-ing').value = '';
-  document.getElementById('an-foto-ing').value = '';
-  document.getElementById('an-preview-ing').style.display = 'none';
-  document.getElementById('an-ocr-status-ing').innerHTML = '';
   document.getElementById('an-fecha-ing').value = todayISO();
+  cancelarCaravana();
+  actualizarContadorLote();
+  renderCaravanasLote();
+  toast('🔄 Lote reiniciado');
+}
+
+// Función legacy mantenida por compatibilidad — ya no se usa desde la UI
+function resetAnimalIng() { reiniciarLote(); }
+
+// ── Reporte SENASA ──
+function exportarSenasa() {
+  const enStock = animales.filter(a => a.estado === 'En stock' && a.categoria === 'Hacienda Engorde');
+  if (!enStock.length) { toast('No hay animales en stock para reportar'); return; }
+  const cols = ['Caravana','Fecha ingreso','Campo','Peso ingreso (kg)','Proveedor','Lote'];
+  const data = enStock
+    .sort((a,b) => (a.caravana||'').localeCompare(b.caravana||''))
+    .map(a => [a.caravana, a.fechaIngreso, a.campo, a.pesoIngreso, a.proveedor||'', a.loteId||'']
+      .map(v => `"${String(v??'').replace(/"/g,'""')}"`).join(','));
+  const encabezado = [
+    `"REPORTE SENASA — STOCK ACTUAL DE HACIENDA"`,
+    `"Generado: ${new Date().toLocaleString('es-AR')}"`,
+    `"Total cabezas en stock: ${enStock.length}"`,
+    '',
+    cols.join(','),
+    ...data,
+  ];
+  downloadCSV(encabezado.join('\r\n'), `senasa_stock_${todayISO()}.csv`);
+  toast(`📑 Reporte SENASA generado · ${enStock.length} caravanas`, '#14532d');
 }
 
 function buscarAnimalEgreso() {
