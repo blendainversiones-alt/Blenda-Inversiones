@@ -932,10 +932,22 @@
       <h2>📥 Ingresar animal (foto caravana)</h2>
       <div class="form-grid">
         <div class="form-group" style="grid-column:1/-1">
-          <label for="an-foto-ing">📷 Foto de caravana</label>
-          <input id="an-foto-ing" type="file" accept="image/*" capture="environment" onchange="procesarFotoOCR(this.files[0], 'ing')" />
-          <div id="an-ocr-status-ing" style="font-size:.78rem;color:var(--gray);margin-top:.35rem">Tocá para sacar la foto. El N° se detecta automáticamente.</div>
-          <img id="an-preview-ing" style="display:none;max-height:140px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
+          <label>📷 Foto de caravana</label>
+          <div id="cam-controls-ing">
+            <button type="button" class="btn btn-primary" onclick="abrirCamara('ing')">📷 Abrir cámara</button>
+            <span style="margin:0 .5rem;color:var(--gray);font-size:.8rem">o subí una foto:</span>
+            <input id="an-foto-ing" type="file" accept="image/*" capture="environment" style="display:inline-block;width:auto" onchange="procesarFotoOCR(this.files[0], 'ing')" />
+          </div>
+          <div id="cam-container-ing" style="display:none;margin-top:.5rem">
+            <video id="cam-video-ing" autoplay playsinline muted style="width:100%;max-height:300px;background:#000;border-radius:8px;object-fit:cover"></video>
+            <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+              <button type="button" class="btn btn-primary" onclick="capturarFoto('ing')">📸 Sacar foto</button>
+              <button type="button" class="btn btn-secondary" onclick="cerrarCamara('ing')">Cancelar</button>
+            </div>
+          </div>
+          <canvas id="cam-canvas-ing" style="display:none"></canvas>
+          <div id="an-ocr-status-ing" style="font-size:.78rem;color:var(--gray);margin-top:.5rem">Tocá "Abrir cámara" para sacar la foto. El N° se detecta automáticamente.</div>
+          <img id="an-preview-ing" style="display:none;max-height:160px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
         </div>
         <div class="form-group">
           <label for="an-caravana-ing">N° de caravana *</label>
@@ -983,10 +995,22 @@
       <p style="font-size:.82rem;color:var(--gray);margin-bottom:.75rem">Sacá la foto de la caravana del animal que sale. El sistema lo busca y lo da de baja del stock.</p>
       <div class="form-grid">
         <div class="form-group" style="grid-column:1/-1">
-          <label for="an-foto-egr">📷 Foto de caravana</label>
-          <input id="an-foto-egr" type="file" accept="image/*" capture="environment" onchange="procesarFotoOCR(this.files[0], 'egr')" />
-          <div id="an-ocr-status-egr" style="font-size:.78rem;color:var(--gray);margin-top:.35rem">Tocá para sacar la foto.</div>
-          <img id="an-preview-egr" style="display:none;max-height:140px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
+          <label>📷 Foto de caravana</label>
+          <div id="cam-controls-egr">
+            <button type="button" class="btn btn-primary" onclick="abrirCamara('egr')">📷 Abrir cámara</button>
+            <span style="margin:0 .5rem;color:var(--gray);font-size:.8rem">o subí una foto:</span>
+            <input id="an-foto-egr" type="file" accept="image/*" capture="environment" style="display:inline-block;width:auto" onchange="procesarFotoOCR(this.files[0], 'egr')" />
+          </div>
+          <div id="cam-container-egr" style="display:none;margin-top:.5rem">
+            <video id="cam-video-egr" autoplay playsinline muted style="width:100%;max-height:300px;background:#000;border-radius:8px;object-fit:cover"></video>
+            <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap">
+              <button type="button" class="btn btn-primary" onclick="capturarFoto('egr')">📸 Sacar foto</button>
+              <button type="button" class="btn btn-secondary" onclick="cerrarCamara('egr')">Cancelar</button>
+            </div>
+          </div>
+          <canvas id="cam-canvas-egr" style="display:none"></canvas>
+          <div id="an-ocr-status-egr" style="font-size:.78rem;color:var(--gray);margin-top:.5rem">Tocá "Abrir cámara" para sacar la foto.</div>
+          <img id="an-preview-egr" style="display:none;max-height:160px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
         </div>
         <div class="form-group">
           <label for="an-caravana-egr">N° de caravana *</label>
@@ -2763,6 +2787,63 @@ function exportSiembrasCSV() {
 document.getElementById('an-fecha-ing').value = todayISO();
 document.getElementById('an-fecha-egr').value = todayISO();
 
+// ── Cámara en vivo (getUserMedia) ──
+const camStreams = { ing: null, egr: null };
+
+async function abrirCamara(tipo) {
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      throw new Error('Sin soporte de cámara en este navegador');
+    }
+    // Intenta cámara trasera; si falla, cae a cualquier cámara
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+    } catch(e) {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+    camStreams[tipo] = stream;
+    const video = document.getElementById(`cam-video-${tipo}`);
+    video.srcObject = stream;
+    await video.play().catch(()=>{});
+    document.getElementById(`cam-container-${tipo}`).style.display = '';
+    document.getElementById(`cam-controls-${tipo}`).style.display = 'none';
+  } catch(e) {
+    console.warn('Cámara:', e);
+    toast('⚠️ No se pudo abrir la cámara. Permití el acceso o subí la foto manualmente.');
+  }
+}
+
+function cerrarCamara(tipo) {
+  const stream = camStreams[tipo];
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  camStreams[tipo] = null;
+  const video = document.getElementById(`cam-video-${tipo}`);
+  if (video) video.srcObject = null;
+  document.getElementById(`cam-container-${tipo}`).style.display = 'none';
+  document.getElementById(`cam-controls-${tipo}`).style.display = '';
+}
+
+function capturarFoto(tipo) {
+  const video  = document.getElementById(`cam-video-${tipo}`);
+  const canvas = document.getElementById(`cam-canvas-${tipo}`);
+  if (!video.videoWidth) { toast('⚠️ La cámara no está lista aún'); return; }
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    cerrarCamara(tipo);
+    if (blob) procesarFotoOCR(blob, tipo);
+  }, 'image/jpeg', 0.9);
+}
+
+// Apagar cámaras al cambiar de página
+const _origShowPage = showPage;
+showPage = function(page, el) {
+  if (page !== 'animales') { cerrarCamara('ing'); cerrarCamara('egr'); }
+  return _origShowPage(page, el);
+};
+
 // ── OCR: extrae número de caravana de la foto con Tesseract.js ──
 async function procesarFotoOCR(file, tipo) {
   if (!file) return;
@@ -2864,8 +2945,9 @@ function resetAnimalIng() {
   document.getElementById('an-notas-ing').value = '';
   document.getElementById('an-foto-ing').value = '';
   document.getElementById('an-preview-ing').style.display = 'none';
-  document.getElementById('an-ocr-status-ing').innerHTML = 'Tocá para sacar la foto. El N° se detecta automáticamente.';
+  document.getElementById('an-ocr-status-ing').innerHTML = 'Tocá "Abrir cámara" para sacar la foto. El N° se detecta automáticamente.';
   document.getElementById('an-fecha-ing').value = todayISO();
+  cerrarCamara('ing');
 }
 
 function buscarAnimalEgreso() {
@@ -2927,9 +3009,10 @@ function resetAnimalEgr() {
   document.getElementById('an-notas-egr').value = '';
   document.getElementById('an-foto-egr').value = '';
   document.getElementById('an-preview-egr').style.display = 'none';
-  document.getElementById('an-ocr-status-egr').innerHTML = 'Tocá para sacar la foto.';
+  document.getElementById('an-ocr-status-egr').innerHTML = 'Tocá "Abrir cámara" para sacar la foto.';
   document.getElementById('an-match-egr').innerHTML = '';
   document.getElementById('an-fecha-egr').value = todayISO();
+  cerrarCamara('egr');
 }
 
 function deleteAnimal(id) {
