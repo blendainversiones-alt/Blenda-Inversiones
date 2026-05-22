@@ -935,7 +935,7 @@
           <input id="an-foto-ing" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'ing')" />
           <button type="button" class="btn btn-primary" style="font-size:1rem;padding:.85rem 1.5rem;width:100%;max-width:320px" onclick="document.getElementById('an-foto-ing').click()">📷 Tomar foto de caravana <small style="opacity:.6">v3</small></button>
           <div id="an-ocr-status-ing" style="font-size:.78rem;color:var(--gray);margin-top:.5rem"></div>
-          <img id="an-preview-ing" style="display:none;max-height:160px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
+          <img id="an-preview-ing" style="display:none;width:100%;max-height:360px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
         </div>
         <div class="form-group">
           <label for="an-caravana-ing">N° de caravana *</label>
@@ -980,7 +980,7 @@
           <input id="an-foto-egr" type="file" accept="image/*" capture="environment" style="display:none" onchange="procesarFotoOCR(this.files[0], 'egr')" />
           <button type="button" class="btn btn-primary" style="font-size:1rem;padding:.85rem 1.5rem;width:100%;max-width:320px;background:#7c3aed" onclick="document.getElementById('an-foto-egr').click()">📷 Tomar foto de caravana <small style="opacity:.6">v3</small></button>
           <div id="an-ocr-status-egr" style="font-size:.78rem;color:var(--gray);margin-top:.5rem"></div>
-          <img id="an-preview-egr" style="display:none;max-height:160px;margin-top:.5rem;border-radius:6px;border:1px solid var(--border)" />
+          <img id="an-preview-egr" style="display:none;width:100%;max-height:360px;object-fit:contain;margin-top:.5rem;border-radius:8px;border:1px solid var(--border);background:#000" />
         </div>
         <div class="form-group">
           <label for="an-caravana-egr">N° de caravana *</label>
@@ -2949,7 +2949,17 @@ async function procesarFotoOCR(file, tipo) {
   // Mostrar preview original
   previewEl.src = URL.createObjectURL(file);
   previewEl.style.display = 'block';
-  statusEl.innerHTML = '⏳ Preparando imagen…';
+
+  // Mostrar dimensiones reales de la foto (diagnóstico de calidad)
+  const tmpImg = new Image();
+  tmpImg.onload = () => {
+    const kb = Math.round(file.size / 1024);
+    const dims = `${tmpImg.naturalWidth}×${tmpImg.naturalHeight}`;
+    const calidad = tmpImg.naturalWidth >= 1500 ? '🟢 alta' :
+                    tmpImg.naturalWidth >= 800  ? '🟡 media' : '🔴 baja';
+    statusEl.innerHTML = `📷 ${dims}px · ${kb} KB · resolución ${calidad}<br>⏳ Preparando imagen…`;
+  };
+  tmpImg.src = URL.createObjectURL(file);
 
   if (typeof Tesseract === 'undefined') {
     statusEl.innerHTML = '⚠️ OCR no disponible. Cargá el número manualmente.';
